@@ -35,30 +35,52 @@ public class Disk {
         this.init();
     }
 
-    private ArrayList<WeatherDataTuple> loadCSV() {
-        ArrayList<WeatherDataTuple> data = new ArrayList<>();
-
-        System.out.printf("Loading data from %s to disk...\n", this.filePath);
-
+    private void init() {
         try {
-            File file = new File(this.filePath);
-            FileReader fileReader = new FileReader(file);
-            BufferedReader bufferedReader = new BufferedReader(fileReader);
-            String[] splitAttr;
-            String line;
+            ArrayList<WeatherDataTuple> table = this.loadCSV();
+            ArrayList<WeatherDataTuple> cTemp = new ArrayList<>();
+            ArrayList<WeatherDataTuple> pTemp = new ArrayList<>();
 
-            while ((line = bufferedReader.readLine()) != null) {
-                splitAttr = line.split(",");
-                // Ignore Headers
-                if (splitAttr[0].equals("id")) continue;
-                WeatherDataTuple tuple = new WeatherDataTuple(stringToInt(splitAttr[0]), stringToDate(splitAttr[1]), splitAttr[2], stringToFloat(splitAttr[3]), stringToFloat(splitAttr[4]));
-                data.add(tuple);
+            // Sorts the table by Station then by Date
+            for (WeatherDataTuple tuple : table) {
+                String station = tuple.getStation();
+                if (station.equals("Changi")) {
+                    cTemp.add(tuple);
+                } else if (station.equals("Paya Lebar")) {
+                    pTemp.add(tuple);
+                }
             }
-            bufferedReader.close();
+            cTemp.sort(new TimestampComparator());
+            pTemp.sort(new TimestampComparator());
+            cTemp.addAll(pTemp);
+
+//            printTable(cTemp.size(), cTemp);
+
+            this.compressAndWriteToColumnStore(cTemp);
         } catch (IOException e) {
             System.out.println("An error occurred while loading data to disk!");
             e.printStackTrace();
         }
+    }
+    private ArrayList<WeatherDataTuple> loadCSV() throws IOException {
+        ArrayList<WeatherDataTuple> data = new ArrayList<>();
+
+        System.out.printf("Loading data from %s to disk...\n", this.filePath);
+
+        File file = new File(this.filePath);
+        FileReader fileReader = new FileReader(file);
+        BufferedReader bufferedReader = new BufferedReader(fileReader);
+        String[] splitAttr;
+        String line;
+
+        while ((line = bufferedReader.readLine()) != null) {
+            splitAttr = line.split(",");
+            // Ignore Headers
+            if (splitAttr[0].equals("id")) continue;
+            WeatherDataTuple tuple = new WeatherDataTuple(stringToInt(splitAttr[0]), stringToDate(splitAttr[1]), splitAttr[2], stringToFloat(splitAttr[3]), stringToFloat(splitAttr[4]));
+            data.add(tuple);
+        }
+        bufferedReader.close();
         return data;
     }
 
@@ -82,33 +104,9 @@ public class Disk {
         return Float.parseFloat(val);
     }
 
-    // Sorts the table by Station then by Date
-    private void init() {
-        ArrayList<WeatherDataTuple> table = this.loadCSV();
-
-        ArrayList<WeatherDataTuple> cTemp = new ArrayList<>();
-        ArrayList<WeatherDataTuple> pTemp = new ArrayList<>();
-
-        //
-        for (WeatherDataTuple tuple : table) {
-            String station = tuple.getStation();
-            if (station.equals("Changi")) {
-                cTemp.add(tuple);
-            } else if (station.equals("Paya Lebar")) {
-                pTemp.add(tuple);
-            }
-        }
-        cTemp.sort(new TimestampComparator());
-        pTemp.sort(new TimestampComparator());
-        cTemp.addAll(pTemp);
-
-        this.compressAndWriteToColumnStore(cTemp);
-
-//        printTable(cTemp.size(), cTemp);
-    }
-
     // For now only compress Station attribute
     private void compressAndWriteToColumnStore(ArrayList<WeatherDataTuple> table) {
+        System.out.println("Compressing and Writing to Column Store on Disk...");
         for (WeatherDataTuple tuple : table) {
             String station = tuple.getStation();
             if (station.equals("Changi")) {
@@ -125,8 +123,8 @@ public class Disk {
         this.idCol.add(Integer.toString(id).getBytes());
         this.timestampCol.add(timestamp.toString().getBytes());
         this.stationCol.add(station.getBytes());
-        this.temperatureCol.add(temperature == null ? "M".getBytes() : Float.toString(temperature).getBytes());
-        this.humidityCol.add(humidity == null ? "M".getBytes() : Float.toString(humidity).getBytes());
+        this.temperatureCol.add(temperature == null ? NaN.getBytes() : Float.toString(temperature).getBytes());
+        this.humidityCol.add(humidity == null ? NaN.getBytes() : Float.toString(humidity).getBytes());
     }
 
     // For debugging

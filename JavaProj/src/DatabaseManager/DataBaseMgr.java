@@ -31,7 +31,6 @@ public class DataBaseMgr {
         String filePath = "javaProj/src/SingaporeWeather.csv";
         this.disk = new Disk(filePath);
         this.bufferSize = 200_000;
-        System.out.println(this.bufferSize);
         this.idColBuffer = new ArrayList<>();
         this.timestampColBuffer = new ArrayList<>();
         this.stationColBuffer = new ArrayList<>();
