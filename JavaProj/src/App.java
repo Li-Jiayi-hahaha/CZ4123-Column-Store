@@ -1,61 +1,67 @@
+import java.lang.Character.UnicodeBlock;
 import java.util.*;
 
-
+import javax.swing.plaf.ComponentInputMapUIResource;
 import javax.tools.DocumentationTool.Location;
 
 public class App {
     public static void main(String[] args) throws Exception {
         try {
-            DB db = new DB();
-            db.readCSV();
-            db.printArray("Changi");
-            // db.printArray("Paya Lebar");
+            App app = new App();
+            app.displayMenu();
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
 
-    // public void displayMenu(int type) throws Exception {
+    public void displayMenu() throws Exception {
 
-    //     if (type == 1) {
-    //         System.out.println("======================================================================================");
-    //         System.out.println("            << Welcome to Group X Project 1 >>");
-    //         System.out.println();
-    //         System.out.println("What would you like to do?");
-    //         System.out.println("1) Initialize DB \n2) Exit");
-    //         System.out.println("======================================================================================");
-    //         System.out.print("You have selected: ");
-    //         Scanner in = new Scanner(System.in);
-    //         String input = in.nextLine();
+        System.out.println("======================================================================================");
+        System.out.println("            << Welcome to Group X Project 1 >>");
+        System.out.println();
+        System.out.println("What would you like to do?");
+        System.out.println("1) Initialize DB \n2) Exit");
+        System.out.println("======================================================================================");
+        System.out.print("You have selected: ");
+        Scanner in = new Scanner(System.in);
+        String input = in.nextLine();
 
-    //         switch (input) {
-    //             case "1":
-    //                 DB db = new DB();
-    //                 db.readCSV();
-    //                 break;
-    //             case "2":
-    //                 System.exit(0);
-    //         }
-            
-    //     } else {
-    //         String input;
-    //         do {
-    //             System.out.println("======================================================================================");
-    //             System.out.println("Enter Metric Number");
-    //             System.out.println("(exit): Exit ");
-    //             System.out.println("======================================================================================");
-    //             System.out.print("Selection: ");
-    //             try (Scanner in = new Scanner(System.in)) {
-    //                 input = in.nextLine();
-    //             }
+        if (input.equals("1")) {
+            DB db = new DB();
+            db.readCSV();
 
-    //         } while (!input.equals("exit"));
+            do {
+                System.out.println("\n\n======================================================================================");
+                System.out.println("Enter Metric Number\n");
+                System.out.println("(exit): Exit ");
+                System.out.println("======================================================================================");
+                System.out.print("Selection: ");
+                input = in.nextLine();
+    
+                if (input.length() == 9 && input.charAt(0) == 'U'){
+                    Output out = new Output();
+                    out.exportToCsv(db.getArray("PayaLebar"));
+                }
+                else if(input.equals("exit")){
+                    System.out.println("Thank You!");
+                }
+                else{
+                    System.out.println("Wrong input, Try again");
+                }
+    
+                
+    
+            } while (!input.equals("exit"));
 
-    //     }
 
 
-    // }
+        } else {
+            System.exit(0);
+        }
+        
+    }
 
 }
 

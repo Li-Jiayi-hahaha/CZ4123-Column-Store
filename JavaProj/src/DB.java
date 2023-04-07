@@ -6,6 +6,8 @@ import java.util.ArrayList;
 // import java.util.Comparator;
 import java.util.List;
 
+import javax.lang.model.util.ElementScanner6;
+
 public class DB {
 
     private List<String[]> sortedData;
@@ -130,6 +132,18 @@ public class DB {
                 }
                 System.out.println();
             }
+        }
+    }
+
+    public List<String[]> getArray(String location){
+        if(location == "Changi"){
+            return dataChangi;
+        }
+        else if (location == "PayaLebar"){
+            return dataPayaLebar;
+        }
+        else{
+            return sortedData;
         }
     }
     
