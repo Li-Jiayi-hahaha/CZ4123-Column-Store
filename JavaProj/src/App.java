@@ -1,11 +1,18 @@
-import java.lang.Character.UnicodeBlock;
-import java.util.*;
+import DatabaseManager.DataBaseMgr;
 
-import javax.swing.plaf.ComponentInputMapUIResource;
-import javax.tools.DocumentationTool.Location;
+import java.util.Scanner;
 
 public class App {
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+        DataBaseMgr dataBaseMgr = new DataBaseMgr();
+        try {
+            dataBaseMgr.createZoneMap();
+            dataBaseMgr.printZoneMap();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         try {
             App app = new App();
             app.displayMenu();
@@ -14,7 +21,6 @@ public class App {
             e.printStackTrace();
         }
     }
-
 
     public void displayMenu() throws Exception {
 
@@ -39,7 +45,7 @@ public class App {
                 System.out.println("======================================================================================");
                 System.out.print("Selection: ");
                 input = in.nextLine();
-    
+
                 if (input.length() == 9 && input.charAt(0) == 'U'){
                     Output out = new Output();
                     out.exportToCsv(db.getArray("PayaLebar"));
@@ -50,9 +56,9 @@ public class App {
                 else{
                     System.out.println("Wrong input, Try again");
                 }
-    
-                
-    
+
+
+
             } while (!input.equals("exit"));
 
 
@@ -60,9 +66,7 @@ public class App {
         } else {
             System.exit(0);
         }
-        
+
     }
 
 }
-
-
