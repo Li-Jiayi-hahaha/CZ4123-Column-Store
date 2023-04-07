@@ -115,7 +115,7 @@ public class Disk {
             } else if (station.equals("Paya Lebar")) {
                 stationCompressed = "P";
             }
-//            System.out.println(tuple);
+
             this.writeToColumnStore(tuple.getId(), tuple.getTimestamp(), stationCompressed, tuple.getTemperature(), tuple.getHumidity());
         }
 
@@ -154,6 +154,13 @@ public class Disk {
         return (idCol.size() == timestampCol.size() && timestampCol.size() == stationCol.size() && stationCol.size() == temperatureCol.size() && temperatureCol.size() == humidityCol.size());
     }
 
+    /**
+     * Zone Map is stored in a HashMap<Integer, ZoneMapMetaData> where the key is an Integer from 0 - x
+     * It is designed in this manner:
+     * - Key is just for indexing
+     * - ZoneMapMetaData contains the lowerIndex, upperIndex of the range for the particular year and station
+     * ZoneMapMetaData contains the relevant information about the items within then range of a particular year
+     */
     public void createZoneMap() {
         if (!checkSize()) return;
         if (zoneMap.size() != 0) return; // Prevent recreation of zonemap if it already exists
@@ -170,15 +177,15 @@ public class Disk {
             String stn = byteToString(stationBytes);
 
             if (year > prevYear) {
-                prevYear = year;
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, stn);
+                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, prevYear, stn);
                 zoneMap.put(key, zoneMapMetaData);
+                prevYear = year;
                 lowerIndex = i;
                 key++;
             }
 
             if (!stn.equals(prevStation)) {
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, prevStation);
+                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, prevYear, prevStation);
                 zoneMap.put(key, zoneMapMetaData);
                 key++;
                 break;
@@ -194,16 +201,16 @@ public class Disk {
             String stn = byteToString(stationBytes);
 
             if (year > prevYear) {
-                prevYear = year;
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, stn);
+                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, prevYear, stn);
                 zoneMap.put(key, zoneMapMetaData);
+                prevYear = year;
                 lowerIndex = i;
                 key++;
             }
             if (i == timestampCol.size() - 1) {
-                prevYear = year;
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i -1, stn);
+                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i -1, prevYear, stn);
                 zoneMap.put(key, zoneMapMetaData);
+                prevYear = year;
                 lowerIndex = i;
                 key++;
             }
