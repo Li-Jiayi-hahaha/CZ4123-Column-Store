@@ -18,26 +18,29 @@ import java.util.HashMap;
  */
 public class Disk {
     private static final String NaN = "M";
-    private final String filePath;
-    private final ArrayList<byte[]> idCol;
-    private final ArrayList<byte[]> daytimeCol;
-    private final ArrayList<byte[]> addrYearMonthCol;
-    private final ArrayList<byte[]> temperatureCol;
-    private final ArrayList<byte[]> humidityCol;
+    private final String csvfilepath;
+    private ArrayList<byte[]> idCol_buffer;
+    private ArrayList<byte[]> daytimeCol_buffer;
+    private ArrayList<byte[]> addrYearMonthCol_buffer;
+    private ArrayList<byte[]> temperatureCol_buffer;
+    private ArrayList<byte[]> humidityCol_buffer;
+    private ColumnStoreDAO columnStoreDAO;
 
-    private ArrayList<WeatherDataTuple> buffer_tuples;
+    private ArrayList<WeatherDataTuple> tuples_buffer;
 
     //private final HashMap<Integer, ZoneMapMetaData> zoneMap;
 
     private final int bufferSize;
 
-    public Disk(String filePath) {
-        this.filePath = filePath;
-        this.idCol = new ArrayList<>();
-        this.daytimeCol = new ArrayList<>();
-        this.addrYearMonthCol = new ArrayList<>();
-        this.temperatureCol = new ArrayList<>();
-        this.humidityCol = new ArrayList<>();
+    public Disk(String csvfilepath) {
+        this.csvfilepath = csvfilepath;
+        this.idCol_buffer = new ArrayList<>();
+        this.daytimeCol_buffer = new ArrayList<>();
+        this.addrYearMonthCol_buffer = new ArrayList<>();
+        this.temperatureCol_buffer = new ArrayList<>();
+        this.humidityCol_buffer = new ArrayList<>();
+
+        this.columnStoreDAO = ColumnStoreDAO.getInstance();
         //this.zoneMap = new HashMap<>();
 
         this.bufferSize = 2000;
@@ -55,11 +58,11 @@ public class Disk {
     }
 
     private void loadCSV() throws IOException {
-        this.buffer_tuples = new ArrayList<>();
+        this.tuples_buffer = new ArrayList<>();
 
-        System.out.printf("Loading data from %s to disk...\n", this.filePath);
+        System.out.printf("Loading data from %s to disk...\n", this.csvfilepath);
 
-        File file = new File(this.filePath);
+        File file = new File(this.csvfilepath);
         FileReader fileReader = new FileReader(file);
         BufferedReader bufferedReader = new BufferedReader(fileReader);
         String[] splitAttr;
@@ -107,27 +110,39 @@ public class Disk {
     }
 
     private void addTupleToInputBuffer(WeatherDataTuple tuple){
-        this.buffer_tuples.add(tuple);
+        this.tuples_buffer.add(tuple);
 
-        if(this.buffer_tuples.size() == this.bufferSize){
+        if(this.tuples_buffer.size() == this.bufferSize){
             this.writeBufferToColumnStore();
         }
     }
 
     private void writeBufferToColumnStore() {
-        for (WeatherDataTuple tuple : this.buffer_tuples) {
+        for (WeatherDataTuple tuple : this.tuples_buffer) {
             this.tupleToColumnStore(tuple);
         }
-        this.buffer_tuples = new ArrayList<>();
+
+        //write buffer to disk storage
+        this.columnStoreDAO.addOneCol(0, this.idCol_buffer);
+        this.columnStoreDAO.addOneCol(1, this.daytimeCol_buffer);
+        this.columnStoreDAO.addOneCol(2, this.addrYearMonthCol_buffer);
+        this.columnStoreDAO.addOneCol(3, this.temperatureCol_buffer);
+        this.columnStoreDAO.addOneCol(4, this.humidityCol_buffer);
+
+        //flash the buffers
+        this.tuples_buffer = new ArrayList<>();
+        this.idCol_buffer = new ArrayList<>();
+        this.daytimeCol_buffer = new ArrayList<>();
+        this.addrYearMonthCol_buffer = new ArrayList<>();
+        this.temperatureCol_buffer = new ArrayList<>();
+        this.humidityCol_buffer = new ArrayList<>();
+
     }
 
-    /*
-     * TODO: replace ArrayList with Disk files
-     */
     private void tupleToColumnStore(WeatherDataTuple tuple) {
 
         byte[] id_comp = TupleCompress.compressID(tuple.getId());
-        idCol.add(id_comp);
+        this.idCol_buffer.add(id_comp);
 
         Date date = tuple.getTimestamp();
         Calendar calendar = new GregorianCalendar();
@@ -140,42 +155,89 @@ public class Disk {
         int minute = calendar.get(Calendar.MINUTE); 
 
         byte[] daytime_comp = TupleCompress.compressDayTime(day, hour, minute);
-        daytimeCol.add(daytime_comp);
+        this.daytimeCol_buffer.add(daytime_comp);
 
         String station = tuple.getStation();
 
         byte[] addryearmonth_comp = TupleCompress.compressAddrYearMonth(station, year, month);
-        addrYearMonthCol.add(addryearmonth_comp);
+        this.addrYearMonthCol_buffer.add(addryearmonth_comp);
 
         byte[] temperature_comp = TupleCompress.compressValue(tuple.getTemperature());
-        temperatureCol.add(temperature_comp);
+        this.temperatureCol_buffer.add(temperature_comp);
 
         byte[] humidity_comp = TupleCompress.compressValue(tuple.getHumidity());
-        humidityCol.add(humidity_comp);
+        this.humidityCol_buffer.add(humidity_comp);
 
     }
 
-    public WeatherDataTuple getRow(int index) throws ParseException {
-        byte[] id_comp = this.idCol.get(index);
+    public ArrayList<String> getAllRows() throws ParseException{
+        ArrayList<String> result = new ArrayList<String>();
+        int num_block = this.columnStoreDAO.getNumBlock();
+
+        for(int i=0;i<num_block;i++){
+            ArrayList<byte[]> id_buffer = this.columnStoreDAO.readOneFile(0, i);
+            ArrayList<byte[]> daytime_buffer = this.columnStoreDAO.readOneFile(1, i);
+            ArrayList<byte[]> addrYearMonth_buffer = this.columnStoreDAO.readOneFile(2, i);
+            ArrayList<byte[]> temperature_buffer = this.columnStoreDAO.readOneFile(3, i);
+            ArrayList<byte[]> humidity_buffer = this.columnStoreDAO.readOneFile(4, i);
+
+            int s = id_buffer.size();
+            for(int j=0;j<s;j++){
+                WeatherDataTuple tuple = decompressRow(id_buffer.get(j), daytime_buffer.get(j), addrYearMonth_buffer.get(j), 
+                                                        temperature_buffer.get(j), humidity_buffer.get(j));
+
+                result.add(tuple.toString());
+            }
+        }
+
+        return result;
+
+    }
+
+    public WeatherDataTuple decompressRow(byte[] id_comp, byte[] daytime_comp, byte[] addr_year_month_comp, 
+                                        byte[] temperature_comp, byte[] humidity_comp) throws ParseException{
+        
         int id = DecompressToTuple.decompressToID(id_comp);
 
-        byte[] daytime_comp = this.daytimeCol.get(index);
-        byte[] addr_year_month_comp = this.addrYearMonthCol.get(index);
+        Date timestamp = DecompressToTuple.decompressToDateTime(daytime_comp, addr_year_month_comp);
+        String station = DecompressToTuple.decompressToStation(addr_year_month_comp);
+        
+        int temperature = DecompressToTuple.decompressToValue(temperature_comp);
+
+        int humidity = DecompressToTuple.decompressToValue(humidity_comp);
+
+        WeatherDataTuple tuple = new WeatherDataTuple(id, timestamp, station, temperature, humidity);
+        
+        return tuple;
+    }
+
+    /* 
+    public WeatherDataTuple getOneRow(int index) throws ParseException {
+        byte[] id_comp = this.idCol_buffer.get(index);
+        int id = DecompressToTuple.decompressToID(id_comp);
+
+        byte[] daytime_comp = this.daytimeCol_buffer.get(index);
+        byte[] addr_year_month_comp = this.addrYearMonthCol_buffer.get(index);
 
         Date timestamp = DecompressToTuple.decompressToDateTime(daytime_comp, addr_year_month_comp);
         String station = DecompressToTuple.decompressToStation(addr_year_month_comp);
 
-        byte[] temperature_comp = this.temperatureCol.get(index);
+        byte[] temperature_comp = this.temperatureCol_buffer.get(index);
         int temperature = DecompressToTuple.decompressToValue(temperature_comp);
 
-        byte[] humidity_comp = this.humidityCol.get(index);
+        byte[] humidity_comp = this.humidityCol_buffer.get(index);
         int humidity = DecompressToTuple.decompressToValue(humidity_comp);
         
         return new WeatherDataTuple(id, timestamp, station, temperature, humidity);
     }
+    */
 
     public int getSize(){
-        return idCol.size();
+        return idCol_buffer.size();
+    }
+
+    public int getNumBlock() {
+        return this.columnStoreDAO.getNumBlock();
     }
 
     /**
@@ -254,7 +316,7 @@ public class Disk {
     private String byteToString(byte[] bytes) {
         return new String(bytes);
     }
-    */
+    
 
     // For debugging
     private void printTable(int head, ArrayList<WeatherDataTuple> table) {
@@ -269,4 +331,5 @@ public class Disk {
             System.out.println(tuple.toString());
         }
     }
+    */
 }

@@ -1,11 +1,12 @@
-import DatabaseManager.DataBaseMgr;
+import Disk.Disk;
 
 import java.util.ArrayList;
 import java.util.Scanner;
 
 public class App {
 
-    private final DataBaseMgr dataBaseMgr;
+    private final Disk dataBaseMgr;
+    private final String filePath = "javaProj/src/SingaporeWeather.csv";
 
     public static void main(String[] args) {
         System.out.println("Hello, World!");
@@ -20,7 +21,7 @@ public class App {
     }
 
     public App() {
-        this.dataBaseMgr = new DataBaseMgr();
+        this.dataBaseMgr = new Disk(filePath);
         /* 
         try {
             this.dataBaseMgr.createZoneMap();
@@ -67,7 +68,7 @@ public class App {
             if (input.equals("2")) {
                 
                 Output out = new Output();
-                ArrayList<String> rows = dataBaseMgr.getRows(0, dataBaseMgr.getSize()-1);
+                ArrayList<String> rows = dataBaseMgr.getAllRows();
                 out.exportDataBaseToCsv(rows);
                 
                 System.out.println("\nThe data is exported to ReproducedTable.csv.\n");
