@@ -1,15 +1,17 @@
 package Disk;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class WeatherDataTuple {
     private final int id;
     private final Date timestamp;
     private final String station;
-    private final Float temperature;
-    private final Float humidity;
+    private final int temperature;
+    private final int humidity;
 
-    protected WeatherDataTuple(int id, Date timestamp, String station, Float temperature, Float humidity) {
+
+    protected WeatherDataTuple(int id, Date timestamp, String station, int temperature, int humidity) {
         this.id = id;
         this.timestamp = timestamp;
         this.station = station;
@@ -29,15 +31,26 @@ public class WeatherDataTuple {
         return station;
     }
 
-    protected Float getTemperature() {
+    protected int getTemperature() {
         return temperature;
     }
 
-    protected Float getHumidity() {
+    protected int getHumidity() {
         return humidity;
     }
 
+    private String timestampToString() {
+        final String dateFormat = "yyyy-MM-dd HH:mm";
+        SimpleDateFormat sf = new SimpleDateFormat(dateFormat);
+        return sf.format(timestamp);
+    }
+
+    private String valToString(int num){
+        if (num==101) return "M";
+        return Integer.toString(num/100) + "." + String.format("%02d",num%100);
+    }
+
     public String toString() {
-        return id + " " + timestamp + " " + station + " " + temperature + " " + humidity;
+        return id + "," + timestampToString() + "," + station + "," + valToString(temperature) + "," + valToString(humidity);
     }
 }

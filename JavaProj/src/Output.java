@@ -5,8 +5,8 @@ import java.util.List;
 
 public class Output {
 
-    public void exportToCsv(List<String[]> Array) throws IOException {
-        String csvFilePath = "output.csv";
+    public void exportToCsv(List<String> Array) throws IOException {
+        String csvFilePath = "javaProj/src/output.csv";
         
         PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath));
         // Write header row
@@ -14,9 +14,20 @@ public class Output {
         writer.println(String.join(",", header));
 
 
-        for ( String[] row : Array ){
-            writer.println(String.join(",", row));
+        for ( String row : Array ){
+            writer.println(row);
         }
+
+        writer.close();
+    }
+
+    public void exportString(String str) throws IOException {
+
+        String csvFilePath = "javaProj/src/output.csv";
+        
+        PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath));
+        // Write str
+        writer.println(str);
 
         writer.close();
     }

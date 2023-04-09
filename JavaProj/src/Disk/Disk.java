@@ -7,63 +7,55 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 
 /**
  * Disk implemented in Column Store manner
+ * TODO: really save column store data to binary files
  */
 public class Disk {
     private static final String NaN = "M";
     private final String filePath;
     private final ArrayList<byte[]> idCol;
-    private final ArrayList<byte[]> timestampCol;
-    private final ArrayList<byte[]> stationCol;
+    private final ArrayList<byte[]> daytimeCol;
+    private final ArrayList<byte[]> addrYearMonthCol;
     private final ArrayList<byte[]> temperatureCol;
     private final ArrayList<byte[]> humidityCol;
 
-    private final HashMap<Integer, ZoneMapMetaData> zoneMap;
+    private ArrayList<WeatherDataTuple> buffer_tuples;
+
+    //private final HashMap<Integer, ZoneMapMetaData> zoneMap;
+
+    private final int bufferSize;
 
     public Disk(String filePath) {
         this.filePath = filePath;
         this.idCol = new ArrayList<>();
-        this.timestampCol = new ArrayList<>();
-        this.stationCol = new ArrayList<>();
+        this.daytimeCol = new ArrayList<>();
+        this.addrYearMonthCol = new ArrayList<>();
         this.temperatureCol = new ArrayList<>();
         this.humidityCol = new ArrayList<>();
-        this.zoneMap = new HashMap<>();
+        //this.zoneMap = new HashMap<>();
+
+        this.bufferSize = 2000;
         this.init();
     }
 
     private void init() {
         try {
-            ArrayList<WeatherDataTuple> table = this.loadCSV();
-            ArrayList<WeatherDataTuple> cTemp = new ArrayList<>();
-            ArrayList<WeatherDataTuple> pTemp = new ArrayList<>();
-
-            // Sorts the table by Station
-            for (WeatherDataTuple tuple : table) {
-                String station = tuple.getStation();
-                if (station.equals("Changi")) {
-                    cTemp.add(tuple);
-                } else if (station.equals("Paya Lebar")) {
-                    pTemp.add(tuple);
-                }
-            }
-            // Sort by Date
-            cTemp.sort(new TimestampComparator());
-            pTemp.sort(new TimestampComparator());
-            // Join changi and paya lebar ArrayList
-            cTemp.addAll(pTemp);
-
-            this.compressAndWriteToColumnStore(cTemp);
+            this.loadCSV();
+            
         } catch (IOException e) {
             System.out.println("An error occurred while loading data to disk!");
             e.printStackTrace();
         }
     }
-    private ArrayList<WeatherDataTuple> loadCSV() throws IOException {
-        ArrayList<WeatherDataTuple> data = new ArrayList<>();
+
+    private void loadCSV() throws IOException {
+        this.buffer_tuples = new ArrayList<>();
 
         System.out.printf("Loading data from %s to disk...\n", this.filePath);
 
@@ -77,12 +69,14 @@ public class Disk {
             splitAttr = line.split(",");
             // Ignore Headers
             if (splitAttr[0].equals("id")) continue;
-            WeatherDataTuple tuple = new WeatherDataTuple(stringToInt(splitAttr[0]), stringToDate(splitAttr[1]), splitAttr[2], stringToFloat(splitAttr[3]), stringToFloat(splitAttr[4]));
-            data.add(tuple);
+            WeatherDataTuple tuple = new WeatherDataTuple(stringToInt(splitAttr[0]), stringToDate(splitAttr[1]), splitAttr[2], stringToValue(splitAttr[3]), stringToValue(splitAttr[4]));
+            this.addTupleToInputBuffer(tuple);
         }
+        this.writeBufferToColumnStore();
         bufferedReader.close();
-        return data;
-    }
+
+        return;
+    } 
 
     private int stringToInt(String val) {
         return Integer.parseInt(val);
@@ -99,59 +93,89 @@ public class Disk {
         }
     }
 
-    private Float stringToFloat(String val) {
-        if (val.equals(NaN)) return null;
-        return Float.parseFloat(val);
-    }
-
-    // For now only compress Station attribute
-    private void compressAndWriteToColumnStore(ArrayList<WeatherDataTuple> table) {
-        System.out.println("Compressing and Writing to Column Store on Disk...");
-        for (WeatherDataTuple tuple : table) {
-            String station = tuple.getStation();
-            String stationCompressed = "M";
-            if (station.equals("Changi")) {
-                stationCompressed = "C";
-            } else if (station.equals("Paya Lebar")) {
-                stationCompressed = "P";
-            }
-
-            this.writeToColumnStore(tuple.getId(), tuple.getTimestamp(), stationCompressed, tuple.getTemperature(), tuple.getHumidity());
+    private int stringToValue(String val) {
+        if (val.equals(NaN)) {
+            return 101;
         }
 
-        System.out.println("Data successfully written into Disk Column Store!");
+        String[] strs = val.split("\\.");
+        int int_part = Integer.parseInt(strs[0]);
+        int frag_part = Integer.parseInt(strs[1]);
+        
+        int num = int_part * 100 + frag_part;
+        return num;
     }
 
-    private void writeToColumnStore(int id, Date timestamp, String station, Float temperature, Float humidity) {
-        this.idCol.add(Integer.toString(id).getBytes());
-        this.timestampCol.add(timestamp.toString().getBytes());
-        this.stationCol.add(station.getBytes());
-        this.temperatureCol.add(temperature == null ? NaN.getBytes() : Float.toString(temperature).getBytes());
-        this.humidityCol.add(humidity == null ? NaN.getBytes() : Float.toString(humidity).getBytes());
-    }
+    private void addTupleToInputBuffer(WeatherDataTuple tuple){
+        this.buffer_tuples.add(tuple);
 
-    public Row getRow(int index) {
-        byte[] id = this.idCol.get(index);
-        byte[] timestamp = this.timestampCol.get(index);
-        byte[] station = this.stationCol.get(index);
-        byte[] temperature = this.temperatureCol.get(index);
-        byte[] humidity = this.humidityCol.get(index);
-        return new Row(id, timestamp, station, temperature, humidity);
-    }
-
-    public byte[] getItemAtColumnOf(int index, ColumnHeader header) {
-        switch (header) {
-            case ID: return this.idCol.get(index);
-            case TIMESTAMP: return this.timestampCol.get(index);
-            case STATION: return this.stationCol.get(index);
-            case TEMPERATURE: return this.temperatureCol.get(index);
-            case HUMIDITY: return this.humidityCol.get(index);
-            default: return new byte[] {};
+        if(this.buffer_tuples.size() == this.bufferSize){
+            this.writeBufferToColumnStore();
         }
     }
 
-    public boolean checkSize() {
-        return (idCol.size() == timestampCol.size() && timestampCol.size() == stationCol.size() && stationCol.size() == temperatureCol.size() && temperatureCol.size() == humidityCol.size());
+    private void writeBufferToColumnStore() {
+        for (WeatherDataTuple tuple : this.buffer_tuples) {
+            this.tupleToColumnStore(tuple);
+        }
+        this.buffer_tuples = new ArrayList<>();
+    }
+
+    /*
+     * TODO: replace ArrayList with Disk files
+     */
+    private void tupleToColumnStore(WeatherDataTuple tuple) {
+
+        byte[] id_comp = TupleCompress.compressID(tuple.getId());
+        idCol.add(id_comp);
+
+        Date date = tuple.getTimestamp();
+        Calendar calendar = new GregorianCalendar();
+        calendar.setTime(date);
+        int year = calendar.get(Calendar.YEAR);
+        //Add one to month {0 - 11}
+        int month = calendar.get(Calendar.MONTH) + 1;
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+        int hour = calendar.get(Calendar.HOUR_OF_DAY); 
+        int minute = calendar.get(Calendar.MINUTE); 
+
+        byte[] daytime_comp = TupleCompress.compressDayTime(day, hour, minute);
+        daytimeCol.add(daytime_comp);
+
+        String station = tuple.getStation();
+
+        byte[] addryearmonth_comp = TupleCompress.compressAddrYearMonth(station, year, month);
+        addrYearMonthCol.add(addryearmonth_comp);
+
+        byte[] temperature_comp = TupleCompress.compressValue(tuple.getTemperature());
+        temperatureCol.add(temperature_comp);
+
+        byte[] humidity_comp = TupleCompress.compressValue(tuple.getHumidity());
+        humidityCol.add(humidity_comp);
+
+    }
+
+    public WeatherDataTuple getRow(int index) throws ParseException {
+        byte[] id_comp = this.idCol.get(index);
+        int id = DecompressToTuple.decompressToID(id_comp);
+
+        byte[] daytime_comp = this.daytimeCol.get(index);
+        byte[] addr_year_month_comp = this.addrYearMonthCol.get(index);
+
+        Date timestamp = DecompressToTuple.decompressToDateTime(daytime_comp, addr_year_month_comp);
+        String station = DecompressToTuple.decompressToStation(addr_year_month_comp);
+
+        byte[] temperature_comp = this.temperatureCol.get(index);
+        int temperature = DecompressToTuple.decompressToValue(temperature_comp);
+
+        byte[] humidity_comp = this.humidityCol.get(index);
+        int humidity = DecompressToTuple.decompressToValue(humidity_comp);
+        
+        return new WeatherDataTuple(id, timestamp, station, temperature, humidity);
+    }
+
+    public int getSize(){
+        return idCol.size();
     }
 
     /**
@@ -161,6 +185,7 @@ public class Disk {
      * - ZoneMapMetaData contains the lowerIndex, upperIndex of the range for the particular year and station
      * ZoneMapMetaData contains the relevant information about the items within then range of a particular year
      */
+    /*
     public void createZoneMap() {
         if (!checkSize()) return;
         if (zoneMap.size() != 0) return; // Prevent recreation of zonemap if it already exists
@@ -229,6 +254,7 @@ public class Disk {
     private String byteToString(byte[] bytes) {
         return new String(bytes);
     }
+    */
 
     // For debugging
     private void printTable(int head, ArrayList<WeatherDataTuple> table) {

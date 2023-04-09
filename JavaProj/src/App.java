@@ -1,17 +1,14 @@
 import DatabaseManager.DataBaseMgr;
 
+import java.util.ArrayList;
 import java.util.Scanner;
 
 public class App {
+
+    private final DataBaseMgr dataBaseMgr;
+
     public static void main(String[] args) {
         System.out.println("Hello, World!");
-        DataBaseMgr dataBaseMgr = new DataBaseMgr();
-        try {
-            dataBaseMgr.createZoneMap();
-            dataBaseMgr.printZoneMap();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
 
         try {
             App app = new App();
@@ -20,6 +17,18 @@ public class App {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public App() {
+        this.dataBaseMgr = new DataBaseMgr();
+        /* 
+        try {
+            this.dataBaseMgr.createZoneMap();
+            this.dataBaseMgr.printZoneMap();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        */
     }
 
     public void displayMenu() throws Exception {
@@ -35,8 +44,8 @@ public class App {
         String input = in.nextLine();
 
         if (input.equals("1")) {
-            DB db = new DB();
-            db.readCSV();
+            //DB db = new DB();
+            //db.readCSV();
 
             do {
                 System.out.println("\n\n======================================================================================");
@@ -48,7 +57,8 @@ public class App {
 
                 if (input.length() == 9 && input.charAt(0) == 'U'){
                     Output out = new Output();
-                    out.exportToCsv(db.getArray("PayaLebar"));
+                    ArrayList<String> rows = dataBaseMgr.getRows(0, dataBaseMgr.getSize()-1);
+                    out.exportToCsv(rows);
                 }
                 else if(input.equals("exit")){
                     System.out.println("Thank You!");
