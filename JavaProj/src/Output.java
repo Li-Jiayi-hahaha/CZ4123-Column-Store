@@ -5,8 +5,8 @@ import java.util.List;
 
 public class Output {
 
-    public void exportToCsv(List<String> Array) throws IOException {
-        String csvFilePath = "javaProj/src/output.csv";
+    public void exportDataBaseToCsv(List<String> Array) throws IOException {
+        String csvFilePath = "javaProj/src/ReproducedTable.csv";
         
         PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath));
         // Write header row
