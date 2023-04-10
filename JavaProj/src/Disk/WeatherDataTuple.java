@@ -15,7 +15,7 @@ public class WeatherDataTuple {
     private final int humidity;
 
 
-    protected WeatherDataTuple(int id, int[] datetime, String station, int temperature, int humidity) {
+    public WeatherDataTuple(int id, int[] datetime, String station, int temperature, int humidity) {
         this.id = id;
 
         this.year = datetime[0];
@@ -29,33 +29,37 @@ public class WeatherDataTuple {
         this.humidity = humidity;
     }
 
-    protected int getId() { return id; }
+    public int getId() { return id; }
 
-    protected int getYear() { return year; }
+    public int getYear() { return year; }
 
-    protected int getMonth() { return month; }
+    public int getMonth() { return month; }
 
-    protected int getDay() { return day; }
+    public int getDay() { return day; }
 
-    protected int getHour() { return hour; }
+    public int getHour() { return hour; }
 
-    protected int getMinute() { return minute; }
+    public int getMinute() { return minute; }
 
-    protected String getStation() { return station; }
+    public String getStation() { return station; }
 
-    protected int getTemperature() { return temperature; }
+    public int getTemperature() { return temperature; }
 
-    protected int getHumidity() { return humidity; }
+    public int getHumidity() { return humidity; }
 
-    protected String timestampToString() {
-        String str_date = String.format("%04d",year) + "-" + String.format("%02d",month) + "-" + String.format("%02d",day);
+    public String timestampToString() {
+        String str_date = getDateString();
         String str_time = String.format("%02d",hour) + ":" + String.format("%02d",minute);
         String str_datetime = str_date + " " + str_time;
         return str_datetime;
     }
 
-    private String valToString(int num){
-        if (num==101) return "M";
+    public String getDateString(){
+        return String.format("%04d",year) + "-" + String.format("%02d",month) + "-" + String.format("%02d",day);
+    }
+
+    public static String valToString(int num){
+        if (num==10100) return "M";
         return Integer.toString(num/100) + "." + String.format("%02d",num%100);
     }
 

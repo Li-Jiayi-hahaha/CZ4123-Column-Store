@@ -31,7 +31,8 @@ public class Disk {
 
     private ArrayList<WeatherDataTuple> tuples_buffer;
 
-    private final ZoneMap zoneMap;;
+    private final ZoneMap zoneMap;
+    private final MinMaxValues minMaxValues;
 
     public Disk() {
         this.csvfilepath = "javaProj/src/SingaporeWeather.csv";
@@ -44,6 +45,7 @@ public class Disk {
 
         this.columnStoreDAO = ColumnStoreDAO.getInstance();
         this.zoneMap = ZoneMap.getInstance();
+        this.minMaxValues = MinMaxValues.getInstance();
 
         this.init();
     }
@@ -119,7 +121,7 @@ public class Disk {
 
     private int stringToValue(String val) {
         if (val.equals(NaN)) {
-            return 101;
+            return 10100;
         }
 
         String[] strs = val.split("\\.");
@@ -132,6 +134,7 @@ public class Disk {
 
     private void addTupleToInputBuffer(WeatherDataTuple tuple){
         this.tuples_buffer.add(tuple);
+        this.minMaxValues.addTuple(tuple);
 
         if(this.tuples_buffer.size() == Constants.BUFFERSIZE){
             this.writeBufferToColumnStore();
@@ -219,7 +222,7 @@ public class Disk {
     public ArrayList<WeatherDataTuple> getBlock(int fid){
         ArrayList<WeatherDataTuple> tuples = new ArrayList<>();
 
-        ArrayList<int[]> idYearMonths = getBlockRIdYearMonth(fid);
+        ArrayList<int[]> idYearMonths = getBlockIdYearMonth(fid);
         ArrayList<int[]> daytimes = getBlockDayTime(fid);
         ArrayList<int[]> temperatureAddrs = getBlockTemperature(fid);
         ArrayList<int[]> humidityAddrs = getBlockHumidity(fid);
@@ -250,7 +253,7 @@ public class Disk {
     }
     
     //{id, year, month}
-    public ArrayList<int[]> getBlockRIdYearMonth(int fid){
+    public ArrayList<int[]> getBlockIdYearMonth(int fid){
 
         ArrayList<byte[]> idYearMonth_compressed_buffer = this.columnStoreDAO.readOneFile(0, fid);
 
