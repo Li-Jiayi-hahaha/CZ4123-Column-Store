@@ -1,21 +1,23 @@
 package Disk;
 
 public class ZoneMapMetaData {
-    private final int lowerIndex;
-    private final int upperIndex;
-    private final int year;
-    private final String station;
+    //earliest date in this block: minyear-minmonth
+    //latest date: maxyear-maxmonth
+    private final int minyear;
+    private final int minmonth;
+    private final int maxyear;
+    private final String maxmonth;
 
-    public ZoneMapMetaData(int lowerIndex, int upperIndex, int year, String station) {
-        this.lowerIndex = lowerIndex;
-        this.upperIndex = upperIndex;
-        this.year = year;
-        this.station = station;
+    public ZoneMapMetaData(int minyear, int minmonth, int maxyear, String maxmonth) {
+        this.minyear = minyear;
+        this.minmonth = minmonth;
+        this.maxyear = maxyear;
+        this.maxmonth = maxmonth;
     }
 
     // for debugging
     @Override
     public String toString() {
-        return "LowerIndex: " + lowerIndex + " " + "UpperIndex: "  + upperIndex + " " + "Year: " + year + " " + "Station: " + station;
+        return "from " + minyear + "-" + minmonth  + " to " + maxyear + "-" + maxmonth;
     }
 }

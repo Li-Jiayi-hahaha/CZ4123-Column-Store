@@ -193,45 +193,18 @@ public class Disk {
         return;
     }
 
-    public ArrayList<String> getAllRows(){
-        ArrayList<String> result = new ArrayList<String>();
+    public ArrayList<String> getAllRowsString(){
+        ArrayList<String> tuple_strs = new ArrayList<String>();
         int num_block = this.columnStoreDAO.getNumBlock();
 
         for(int i=0;i<num_block;i++){
-            ArrayList<byte[]> idYearMonth_compressed_buffer = this.columnStoreDAO.readOneFile(0, i);
-            ArrayList<byte[]> daytime_buffer = this.columnStoreDAO.readOneFile(1, i);
-            ArrayList<byte[]> temperature_buffer = this.columnStoreDAO.readOneFile(2, i);
-            ArrayList<byte[]> humidity_buffer = this.columnStoreDAO.readOneFile(3, i);
-
-            int s = temperature_buffer.size();
-            int cnt = -1;
-            int start_id = -1, year = -1, month = -1;
-            int[] start_idYearMonth;
-            int next_id = -1;
-
-            for(int j=0;j<s;j++){
-                //decompress from the vertical compression of yearmonth column
-                if(j>=next_id){
-                    cnt += 1;
-                    start_idYearMonth = DecompressToTuple.decompressToIdYearMonth(idYearMonth_compressed_buffer.get(cnt)) ;
-                    start_id = start_idYearMonth[0];
-                    year = start_idYearMonth[1];
-                    month = start_idYearMonth[2];
-                    if(idYearMonth_compressed_buffer.size()>cnt+1){
-                        int[] next_idYearMonth = DecompressToTuple.decompressToIdYearMonth(idYearMonth_compressed_buffer.get(cnt+1));
-                        next_id = next_idYearMonth[0];
-                    }
-                    else next_id = bufferSize;
-                }
-
-                WeatherDataTuple tuple = decompressRow(i, j, year, month, daytime_buffer.get(j),
-                                                        temperature_buffer.get(j), humidity_buffer.get(j));
-
-                result.add(tuple.toString());
+            ArrayList<WeatherDataTuple> tuples = getBlock(i);
+            for(WeatherDataTuple tuple: tuples){
+                tuple_strs.add(tuple.toString());
             }
         }
 
-        return result;
+        return tuple_strs;
 
     }
 
@@ -258,6 +231,43 @@ public class Disk {
         return tuple;
     }
 
+    public ArrayList<WeatherDataTuple> getBlock(int fid){
+        ArrayList<byte[]> idYearMonth_compressed_buffer = this.columnStoreDAO.readOneFile(0, fid);
+        ArrayList<byte[]> daytime_buffer = this.columnStoreDAO.readOneFile(1, fid);
+        ArrayList<byte[]> temperature_buffer = this.columnStoreDAO.readOneFile(2, fid);
+        ArrayList<byte[]> humidity_buffer = this.columnStoreDAO.readOneFile(3, fid);
+
+        int s = temperature_buffer.size();
+        int cnt = -1;
+        int start_id = -1, year = -1, month = -1;
+        int[] start_idYearMonth;
+        int next_id = -1;
+
+        ArrayList<WeatherDataTuple> result = new ArrayList<>();
+
+        for(int j=0;j<s;j++){
+            //decompress from the vertical compression of yearmonth column
+            if(j>=next_id){
+                cnt += 1;
+                start_idYearMonth = DecompressToTuple.decompressToIdYearMonth(idYearMonth_compressed_buffer.get(cnt)) ;
+                start_id = start_idYearMonth[0];
+                year = start_idYearMonth[1];
+                month = start_idYearMonth[2];
+                if(idYearMonth_compressed_buffer.size()>cnt+1){
+                    int[] next_idYearMonth = DecompressToTuple.decompressToIdYearMonth(idYearMonth_compressed_buffer.get(cnt+1));
+                    next_id = next_idYearMonth[0];
+                }
+                else next_id = bufferSize;
+            }
+
+            WeatherDataTuple tuple = decompressRow(fid, j, year, month, daytime_buffer.get(j),
+                                                    temperature_buffer.get(j), humidity_buffer.get(j));
+            result.add(tuple);
+        }
+
+        return result;
+    }
+    
     /* 
     public WeatherDataTuple getOneRow(int index) throws ParseException {
         byte[] id_comp = this.idCol_buffer.get(index);

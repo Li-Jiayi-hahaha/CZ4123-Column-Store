@@ -68,7 +68,7 @@ public class App {
             if (input.equals("2")) {
                 
                 Output out = new Output();
-                ArrayList<String> rows = dataBaseMgr.getAllRows();
+                ArrayList<String> rows = dataBaseMgr.getAllRowsString();
                 out.exportDataBaseToCsv(rows);
                 
                 System.out.println("\nThe data is exported to ReproducedTable.csv.\n");
