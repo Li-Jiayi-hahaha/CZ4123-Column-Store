@@ -10,13 +10,14 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.HashMap;
 
 /**
  * Disk implemented in Column Store manner
  * TODO: really save column store data to binary files
  */
 public class Disk {
+    private static Disk single_instance = null;
+
     private static final String NaN = "M";
     private final String csvfilepath;
 
@@ -30,12 +31,10 @@ public class Disk {
 
     private ArrayList<WeatherDataTuple> tuples_buffer;
 
-    //private final HashMap<Integer, ZoneMapMetaData> zoneMap;
+    private final ZoneMap zoneMap;;
 
-    private final int bufferSize;
-
-    public Disk(String csvfilepath) {
-        this.csvfilepath = csvfilepath;
+    public Disk() {
+        this.csvfilepath = "javaProj/src/SingaporeWeather.csv";
 
         this.ver_compYearMonth = new ArrayList<>();
         this.yearMonthCol_buffer = new ArrayList<>();
@@ -44,9 +43,8 @@ public class Disk {
         this.humidityCol_buffer = new ArrayList<>();
 
         this.columnStoreDAO = ColumnStoreDAO.getInstance();
-        //this.zoneMap = new HashMap<>();
+        this.zoneMap = ZoneMap.getInstance();
 
-        this.bufferSize = 2000;
         this.init();
     }
 
@@ -58,6 +56,15 @@ public class Disk {
             System.out.println("An error occurred while loading data to disk!");
             e.printStackTrace();
         }
+    }
+
+    public static synchronized Disk getInstance()
+    {
+        if (single_instance == null){
+            single_instance = new Disk();
+        }
+  
+        return single_instance;
     }
 
     private void loadCSV() throws IOException {
@@ -126,7 +133,7 @@ public class Disk {
     private void addTupleToInputBuffer(WeatherDataTuple tuple){
         this.tuples_buffer.add(tuple);
 
-        if(this.tuples_buffer.size() == this.bufferSize){
+        if(this.tuples_buffer.size() == Constants.BUFFERSIZE){
             this.writeBufferToColumnStore();
         }
     }
@@ -142,9 +149,11 @@ public class Disk {
         this.columnStoreDAO.addOneCol(2, this.temperatureCol_buffer);
         this.columnStoreDAO.addOneCol(3, this.humidityCol_buffer);
 
+        //add this block's info to zone map
+        this.zoneMap.addOneBlock(ver_compYearMonth);
+
         //flash the buffers
         this.tuples_buffer = new ArrayList<>();
-
         this.ver_compYearMonth = new ArrayList<>();
         this.yearMonthCol_buffer = new ArrayList<>();
         this.daytimeCol_buffer = new ArrayList<>();
@@ -203,47 +212,58 @@ public class Disk {
                 tuple_strs.add(tuple.toString());
             }
         }
-
         return tuple_strs;
 
     }
 
-    public WeatherDataTuple decompressRow(int fid, int remain_id, int year, int month, byte[] daytime_comp,
-                                        byte[] temperature_comp, byte[] humidity_comp){
-
-        int id = fid*bufferSize + remain_id;
-
-        int[] daytime = DecompressToTuple.decompressToDayTime(daytime_comp);
-        int day = daytime[0], hour = daytime[1], minute = daytime[2];
-
-        int[] datetime = {year, month, day, hour, minute};
-        
-        int[] temperature_addr = DecompressToTuple.decompressToValue(temperature_comp);
-        int temperature = temperature_addr[0];
-        int addr = temperature_addr[1];
-        String station = addr == 0? "Changi": "Paya Lebar";
-
-        int[] humidity_addr = DecompressToTuple.decompressToValue(humidity_comp);
-        int humidity = humidity_addr[0];
-
-        WeatherDataTuple tuple = new WeatherDataTuple(id, datetime , station, temperature, humidity);
-        
-        return tuple;
-    }
-
     public ArrayList<WeatherDataTuple> getBlock(int fid){
-        ArrayList<byte[]> idYearMonth_compressed_buffer = this.columnStoreDAO.readOneFile(0, fid);
-        ArrayList<byte[]> daytime_buffer = this.columnStoreDAO.readOneFile(1, fid);
-        ArrayList<byte[]> temperature_buffer = this.columnStoreDAO.readOneFile(2, fid);
-        ArrayList<byte[]> humidity_buffer = this.columnStoreDAO.readOneFile(3, fid);
+        ArrayList<WeatherDataTuple> tuples = new ArrayList<>();
 
-        int s = temperature_buffer.size();
+        ArrayList<int[]> idYearMonths = getBlockRIdYearMonth(fid);
+        ArrayList<int[]> daytimes = getBlockDayTime(fid);
+        ArrayList<int[]> temperatureAddrs = getBlockTemperature(fid);
+        ArrayList<int[]> humidityAddrs = getBlockHumidity(fid);
+
+        int s = temperatureAddrs.size();
+
+        for(int i=0;i<s;i++){
+            int[] idYearMonth = idYearMonths.get(i);
+            int id = idYearMonth[0], year = idYearMonth[1], month = idYearMonth[2];
+
+            int[] daytime = daytimes.get(i);
+            int day = daytime[0], hour = daytime[1], minute = daytime[2];
+
+            int[] temperatureAddr = temperatureAddrs.get(i);
+            int temperature = temperatureAddr[0], addr = temperatureAddr[1];
+
+            int[] humidityAddr = humidityAddrs.get(i);
+            int humidity = humidityAddr[0];
+
+            String station = addr == 0? "Changi" : "Paya Lebar";
+            int[] datetime = {year, month, day, hour, minute};
+            WeatherDataTuple tuple = new WeatherDataTuple(id, datetime, station, temperature, humidity);
+
+            tuples.add(tuple);
+        }
+
+        return tuples;
+    }
+    
+    //{id, year, month}
+    public ArrayList<int[]> getBlockRIdYearMonth(int fid){
+
+        ArrayList<byte[]> idYearMonth_compressed_buffer = this.columnStoreDAO.readOneFile(0, fid);
+
+        int n = columnStoreDAO.getNumBlock();
+        int s = -1;
+        if(fid < n-1) s = Constants.BUFFERSIZE;
+        else s = columnStoreDAO.getLastBlockSize();
         int cnt = -1;
         int start_id = -1, year = -1, month = -1;
         int[] start_idYearMonth;
         int next_id = -1;
 
-        ArrayList<WeatherDataTuple> result = new ArrayList<>();
+        ArrayList<int[]> result = new ArrayList<>();
 
         for(int j=0;j<s;j++){
             //decompress from the vertical compression of yearmonth column
@@ -257,136 +277,70 @@ public class Disk {
                     int[] next_idYearMonth = DecompressToTuple.decompressToIdYearMonth(idYearMonth_compressed_buffer.get(cnt+1));
                     next_id = next_idYearMonth[0];
                 }
-                else next_id = bufferSize;
+                else next_id = s;
             }
-
-            WeatherDataTuple tuple = decompressRow(fid, j, year, month, daytime_buffer.get(j),
-                                                    temperature_buffer.get(j), humidity_buffer.get(j));
-            result.add(tuple);
+            int[] arr = {j + fid*Constants.BUFFERSIZE, year, month};
+            result.add(arr);
         }
 
         return result;
+
     }
-    
-    /* 
-    public WeatherDataTuple getOneRow(int index) throws ParseException {
-        byte[] id_comp = this.idCol_buffer.get(index);
-        int id = DecompressToTuple.decompressToID(id_comp);
 
-        byte[] daytime_comp = this.daytimeCol_buffer.get(index);
-        byte[] addr_year_month_comp = this.addrYearMonthCol_buffer.get(index);
+    //{day, hour, min}
+    public ArrayList<int[]> getBlockDayTime(int fid){
+        ArrayList<byte[]> daytime_buffer = this.columnStoreDAO.readOneFile(1, fid);
 
-        Date timestamp = DecompressToTuple.decompressToDateTime(daytime_comp, addr_year_month_comp);
-        String station = DecompressToTuple.decompressToStation(addr_year_month_comp);
+        ArrayList<int[]> result = new ArrayList<>();
 
-        byte[] temperature_comp = this.temperatureCol_buffer.get(index);
-        int temperature = DecompressToTuple.decompressToValue(temperature_comp);
-
-        byte[] humidity_comp = this.humidityCol_buffer.get(index);
-        int humidity = DecompressToTuple.decompressToValue(humidity_comp);
-        
-        return new WeatherDataTuple(id, timestamp, station, temperature, humidity);
+        for(byte[] daytime_bytes: daytime_buffer){
+            int[] daytime = DecompressToTuple.decompressToDayTime(daytime_bytes);
+            int day = daytime[0], hour = daytime[1], minute = daytime[2];
+            int[] arr = {day, hour, minute};
+            result.add(arr);
+        }
+        return result;
     }
-    */
+
+    //{temperature, addr}
+    public ArrayList<int[]> getBlockTemperature(int fid){
+        ArrayList<byte[]> temperature_buffer = this.columnStoreDAO.readOneFile(2, fid);
+
+        ArrayList<int[]> result = new ArrayList<>();
+
+        for(byte[] temperature_bytes: temperature_buffer){
+            int[] temperature_addr = DecompressToTuple.decompressToValue(temperature_bytes);
+            int temperature = temperature_addr[0];
+            int addr = temperature_addr[1];
+            int[] arr = {temperature, addr};
+            result.add(arr);
+        }
+        return result;
+    }
+
+    //{humidity, addr}
+    public ArrayList<int[]> getBlockHumidity(int fid){
+        ArrayList<byte[]> humidity_buffer = this.columnStoreDAO.readOneFile(3, fid);
+
+        ArrayList<int[]> result = new ArrayList<>();
+
+        for(byte[] humidity_bytes: humidity_buffer){
+            int[] humidity_addr = DecompressToTuple.decompressToValue(humidity_bytes);
+            int humidity = humidity_addr[0];
+            int addr = humidity_addr[1];
+            int[] arr = {humidity, addr};
+            result.add(arr);
+        }
+        return result;
+    }
 
     public int getSize(){
-        return this.temperatureCol_buffer.size() + getNumBlock()*bufferSize;
+        return this.temperatureCol_buffer.size() + getNumBlock()*Constants.BUFFERSIZE;
     }
 
     public int getNumBlock() {
         return this.columnStoreDAO.getNumBlock();
     }
 
-    /**
-     * Zone Map is stored in a HashMap<Integer, ZoneMapMetaData> where the key is an Integer from 0 - x
-     * It is designed in this manner:
-     * - Key is just for indexing
-     * - ZoneMapMetaData contains the lowerIndex, upperIndex of the range for the particular year and station
-     * ZoneMapMetaData contains the relevant information about the items within then range of a particular year
-     */
-    /*
-    public void createZoneMap() {
-        if (!checkSize()) return;
-        if (zoneMap.size() != 0) return; // Prevent recreation of zonemap if it already exists
-
-        int prevYear = 2002;
-        int lowerIndex = 0;
-        int key = 0;
-        int i = 0;
-        String prevStation = "C";
-        for (; i < timestampCol.size(); i++) {
-            byte[] timestampBytes = timestampCol.get(i);
-            byte[] stationBytes = stationCol.get(i);
-            int year = byteToYear(timestampBytes);
-            String stn = byteToString(stationBytes);
-
-            if (year > prevYear) {
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, prevYear, stn);
-                zoneMap.put(key, zoneMapMetaData);
-                prevYear = year;
-                lowerIndex = i;
-                key++;
-            }
-
-            if (!stn.equals(prevStation)) {
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, prevYear, prevStation);
-                zoneMap.put(key, zoneMapMetaData);
-                key++;
-                break;
-            }
-        }
-
-        lowerIndex = i;
-        prevYear = 2002;
-        for (; i < timestampCol.size(); i++) {
-            byte[] timestampBytes = timestampCol.get(i);
-            byte[] stationBytes = stationCol.get(i);
-            int year = byteToYear(timestampBytes);
-            String stn = byteToString(stationBytes);
-
-            if (year > prevYear) {
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i - 1, prevYear, stn);
-                zoneMap.put(key, zoneMapMetaData);
-                prevYear = year;
-                lowerIndex = i;
-                key++;
-            }
-            if (i == timestampCol.size() - 1) {
-                ZoneMapMetaData zoneMapMetaData = new ZoneMapMetaData(lowerIndex, i -1, prevYear, stn);
-                zoneMap.put(key, zoneMapMetaData);
-                prevYear = year;
-                lowerIndex = i;
-                key++;
-            }
-        }
-    }
-
-    public HashMap<Integer, ZoneMapMetaData> getZoneMap() {
-        return zoneMap;
-    }
-
-    public int byteToYear(byte[] bytes) {
-        String dateStr = new String(bytes);
-        return Integer.parseInt(dateStr.split(" ")[5]);
-    }
-
-    private String byteToString(byte[] bytes) {
-        return new String(bytes);
-    }
     
-
-    // For debugging
-    private void printTable(int head, ArrayList<WeatherDataTuple> table) {
-        if (table.size() == 0) {
-            System.out.println("Table has not been initialized!");
-            return;
-        }
-
-        System.out.printf("Printing %d rows from disk\n", head);
-        for (int i = 0; i < head; i++) {
-            WeatherDataTuple tuple = table.get(i);
-            System.out.println(tuple.toString());
-        }
-    }
-    */
 }

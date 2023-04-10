@@ -6,7 +6,6 @@ import java.util.Scanner;
 public class App {
 
     private final Disk dataBaseMgr;
-    private final String filePath = "javaProj/src/SingaporeWeather.csv";
 
     public static void main(String[] args) {
         System.out.println("Hello, World!");
@@ -21,7 +20,7 @@ public class App {
     }
 
     public App() {
-        this.dataBaseMgr = new Disk(filePath);
+        this.dataBaseMgr = Disk.getInstance();
         /* 
         try {
             this.dataBaseMgr.createZoneMap();
