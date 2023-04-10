@@ -6,40 +6,34 @@ import java.util.Date;
 
 public class DecompressToTuple {
 
-    public static int decompressToID(byte[] id_bytes) {
-        return (id_bytes[2] & 0xFF) << 16 | (id_bytes[1] & 0xFF) <<8 | (id_bytes[0] & 0xFF);
+    public static int[] decompressToIdYearMonth(byte[] idYearMonth_bytes){
+        int idYearMonth = (idYearMonth_bytes[2] & 0xFF) << 16 | (idYearMonth_bytes[1] & 0xFF) <<8 | (idYearMonth_bytes[0] & 0xFF);
+
+        int id = idYearMonth >> 9;
+        int year = (idYearMonth - (id << 9)) >> 4;
+        year += 2002;
+        int month = idYearMonth % 16;
+
+        int[] result = {id, year, month};
+        return result;
     }
 
-    public static String decompressToStation(byte[] addryearmonth_bytes) {
-        int addr_year_month = (addryearmonth_bytes[1] & 0xFF) <<8 | (addryearmonth_bytes[0] & 0xFF);
-        int addr = addr_year_month >> 11;
-        return (addr == 0) ? "Changi" : "Paya Lebar";
-    }
-
-    public static Date decompressToDateTime(byte[] daytime_bytes, byte[] addryearmonth_bytes) throws ParseException{
-        final String dateFormat = "yyyy-MM-dd HH:mm";
-        SimpleDateFormat sf = new SimpleDateFormat(dateFormat);
-
+    public static int[] decompressToDayTime(byte[] daytime_bytes){
         int daytime = (daytime_bytes[1] & 0xFF) <<8 | (daytime_bytes[0] & 0xFF);
         int day = daytime >> 11;
         int hour = (daytime - (day << 11)) >> 6;
         int minute = daytime % 64;
 
-        int addr_year_month = (addryearmonth_bytes[1] & 0xFF) <<8 | (addryearmonth_bytes[0] & 0xFF);
-        int year_month = addr_year_month % 2048;
-        int year = 2002 + (year_month >> 4);
-        int month = year_month % 16;
-
-        String str_date = Integer.toString(year) + "-" + Integer.toString(month) + "-" + Integer.toString(day);
-        String str_time = Integer.toString(hour) + ":" + Integer.toString(minute);
-        String str_datetime = str_date + " " + str_time;
-        return sf.parse(str_datetime);
+        int[] result = {day, hour, minute};
+        return result;
     }
 
-    public static int decompressToValue(byte[] float_bytes){
-
-        int num = float_bytes[0]*100 + float_bytes[1];
-        return num;
+    public static int[] decompressToValue(byte[] value_addr_bytes){
+        int num = (value_addr_bytes[1] & 0xFF) <<8 | (value_addr_bytes[0] & 0xFF);
+        int addr = num%2;
+        int value = num>>1;
+        int[] result = {value, addr};
+        return result;
     }
 
 }

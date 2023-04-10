@@ -12,20 +12,31 @@ public class ColumnStoreDAO{
     private static ColumnStoreDAO single_instance = null;
 
     //example of file path: javaProj/src/DiskStorage/id/0.bin
-    private final String[] folder_names = {"id/", "daytime/", "addrYearMonth/", "temperature/", "humidity/"};
-    private final int[] item_sizes = {3,2,2,2,2};
+    private final String[] folder_names = {"yearMonth/", "daytime/", "temperature/", "humidity/"};
+    private final int[] item_sizes = {3,2,2,2};
     private final String folder_path_prefix = "javaProj/src/DiskStorage/";
     private final int buffer_size = 2000;
     private int[] num_files;
 
     public ColumnStoreDAO(){
-        num_files = new int[]{0,0,0,0,0};
+        num_files = new int[]{0,0,0,0};
+
+        //deleting old files in the disk storage
+        for(int i=0;i<4;i++) purgeDirectory(folder_path_prefix + folder_names[i]); 
+    }
+
+    private void purgeDirectory(String dir_path) {
+        File dir = new File(dir_path);
+        for (File file: dir.listFiles()) {
+            file.delete();
+        }
     }
 
     public static synchronized ColumnStoreDAO getInstance()
     {
-        if (single_instance == null)
+        if (single_instance == null){
             single_instance = new ColumnStoreDAO();
+        }
   
         return single_instance;
     }

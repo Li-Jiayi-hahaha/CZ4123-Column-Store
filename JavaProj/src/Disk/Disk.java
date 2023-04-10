@@ -19,9 +19,11 @@ import java.util.HashMap;
 public class Disk {
     private static final String NaN = "M";
     private final String csvfilepath;
-    private ArrayList<byte[]> idCol_buffer;
+
+    //int[3]: id, year, month
+    private ArrayList<int[]> ver_compYearMonth;
+    private ArrayList<byte[]> yearMonthCol_buffer;
     private ArrayList<byte[]> daytimeCol_buffer;
-    private ArrayList<byte[]> addrYearMonthCol_buffer;
     private ArrayList<byte[]> temperatureCol_buffer;
     private ArrayList<byte[]> humidityCol_buffer;
     private ColumnStoreDAO columnStoreDAO;
@@ -34,9 +36,10 @@ public class Disk {
 
     public Disk(String csvfilepath) {
         this.csvfilepath = csvfilepath;
-        this.idCol_buffer = new ArrayList<>();
+
+        this.ver_compYearMonth = new ArrayList<>();
+        this.yearMonthCol_buffer = new ArrayList<>();
         this.daytimeCol_buffer = new ArrayList<>();
-        this.addrYearMonthCol_buffer = new ArrayList<>();
         this.temperatureCol_buffer = new ArrayList<>();
         this.humidityCol_buffer = new ArrayList<>();
 
@@ -85,15 +88,26 @@ public class Disk {
         return Integer.parseInt(val);
     }
 
-    private Date stringToDate(String val) {
+    private int[] stringToDate(String val) {
+        int[] datetime = {};
         final String dateFormat = "yyyy-MM-dd HH:mm";
         SimpleDateFormat sf = new SimpleDateFormat(dateFormat);
         try {
-            return sf.parse(val);
+            Date date = sf.parse(val);
+            Calendar calendar = new GregorianCalendar();
+            calendar.setTime(date);
+            int year = calendar.get(Calendar.YEAR);
+            //Add one to month {0 - 11}
+            int month = calendar.get(Calendar.MONTH) + 1;
+            int day = calendar.get(Calendar.DAY_OF_MONTH);
+            int hour = calendar.get(Calendar.HOUR_OF_DAY); 
+            int minute = calendar.get(Calendar.MINUTE);
+            datetime = new int[]{year, month, day, hour, minute};
+            
         } catch (ParseException e) {
             e.printStackTrace();
-            return null;
         }
+        return datetime;
     }
 
     private int stringToValue(String val) {
@@ -119,71 +133,98 @@ public class Disk {
 
     private void writeBufferToColumnStore() {
         for (WeatherDataTuple tuple : this.tuples_buffer) {
-            this.tupleToColumnStore(tuple);
+            this.tupleToColumnBuffer(tuple);
         }
 
         //write buffer to disk storage
-        this.columnStoreDAO.addOneCol(0, this.idCol_buffer);
+        this.columnStoreDAO.addOneCol(0, this.yearMonthCol_buffer);
         this.columnStoreDAO.addOneCol(1, this.daytimeCol_buffer);
-        this.columnStoreDAO.addOneCol(2, this.addrYearMonthCol_buffer);
-        this.columnStoreDAO.addOneCol(3, this.temperatureCol_buffer);
-        this.columnStoreDAO.addOneCol(4, this.humidityCol_buffer);
+        this.columnStoreDAO.addOneCol(2, this.temperatureCol_buffer);
+        this.columnStoreDAO.addOneCol(3, this.humidityCol_buffer);
 
         //flash the buffers
         this.tuples_buffer = new ArrayList<>();
-        this.idCol_buffer = new ArrayList<>();
+
+        this.ver_compYearMonth = new ArrayList<>();
+        this.yearMonthCol_buffer = new ArrayList<>();
         this.daytimeCol_buffer = new ArrayList<>();
-        this.addrYearMonthCol_buffer = new ArrayList<>();
         this.temperatureCol_buffer = new ArrayList<>();
         this.humidityCol_buffer = new ArrayList<>();
 
     }
 
-    private void tupleToColumnStore(WeatherDataTuple tuple) {
+    private void tupleToColumnBuffer(WeatherDataTuple tuple) {
 
-        byte[] id_comp = TupleCompress.compressID(tuple.getId());
-        this.idCol_buffer.add(id_comp);
-
-        Date date = tuple.getTimestamp();
-        Calendar calendar = new GregorianCalendar();
-        calendar.setTime(date);
-        int year = calendar.get(Calendar.YEAR);
-        //Add one to month {0 - 11}
-        int month = calendar.get(Calendar.MONTH) + 1;
-        int day = calendar.get(Calendar.DAY_OF_MONTH);
-        int hour = calendar.get(Calendar.HOUR_OF_DAY); 
-        int minute = calendar.get(Calendar.MINUTE); 
+        int id = tuple.getId();
+        int year = tuple.getYear();
+        int month = tuple.getMonth();
+        int day = tuple.getDay();
+        int hour = tuple.getHour(); 
+        int minute = tuple.getMinute(); 
 
         byte[] daytime_comp = TupleCompress.compressDayTime(day, hour, minute);
         this.daytimeCol_buffer.add(daytime_comp);
 
+        addTupleToVerticallyCompressedYearMonth(id, year, month);
+
         String station = tuple.getStation();
+        int addr = station.equals("Changi")? 0:1;
 
-        byte[] addryearmonth_comp = TupleCompress.compressAddrYearMonth(station, year, month);
-        this.addrYearMonthCol_buffer.add(addryearmonth_comp);
-
-        byte[] temperature_comp = TupleCompress.compressValue(tuple.getTemperature());
+        byte[] temperature_comp = TupleCompress.compressValue(tuple.getTemperature(), addr);
         this.temperatureCol_buffer.add(temperature_comp);
 
-        byte[] humidity_comp = TupleCompress.compressValue(tuple.getHumidity());
+        byte[] humidity_comp = TupleCompress.compressValue(tuple.getHumidity(), addr);
         this.humidityCol_buffer.add(humidity_comp);
 
     }
 
-    public ArrayList<String> getAllRows() throws ParseException{
+    private void addTupleToVerticallyCompressedYearMonth(int id, int year, int month){
+        int s = this.ver_compYearMonth.size();
+        if(s!=0){
+            int[] last = this.ver_compYearMonth.get(s-1);
+            if(last[1]==year && last[2]==month) return;
+        }
+
+        int[] arr = new int[]{id, year, month};
+        this.ver_compYearMonth.add(arr);
+
+        byte[] idYearMonth = TupleCompress.compressIdYearMonth(id, year, month);
+        this.yearMonthCol_buffer.add(idYearMonth);
+        return;
+    }
+
+    public ArrayList<String> getAllRows(){
         ArrayList<String> result = new ArrayList<String>();
         int num_block = this.columnStoreDAO.getNumBlock();
 
         for(int i=0;i<num_block;i++){
-            ArrayList<byte[]> id_buffer = this.columnStoreDAO.readOneFile(0, i);
+            ArrayList<byte[]> idYearMonth_compressed_buffer = this.columnStoreDAO.readOneFile(0, i);
             ArrayList<byte[]> daytime_buffer = this.columnStoreDAO.readOneFile(1, i);
-            ArrayList<byte[]> addrYearMonth_buffer = this.columnStoreDAO.readOneFile(2, i);
-            ArrayList<byte[]> temperature_buffer = this.columnStoreDAO.readOneFile(3, i);
-            ArrayList<byte[]> humidity_buffer = this.columnStoreDAO.readOneFile(4, i);
+            ArrayList<byte[]> temperature_buffer = this.columnStoreDAO.readOneFile(2, i);
+            ArrayList<byte[]> humidity_buffer = this.columnStoreDAO.readOneFile(3, i);
 
-            int s = id_buffer.size();
+            int s = temperature_buffer.size();
+            int cnt = -1;
+            int start_id = -1, year = -1, month = -1;
+            int[] start_idYearMonth;
+            int next_id = -1;
+
             for(int j=0;j<s;j++){
-                WeatherDataTuple tuple = decompressRow(id_buffer.get(j), daytime_buffer.get(j), addrYearMonth_buffer.get(j), 
+                //decompress from the vertical compression of yearmonth column
+                if(j>=next_id){
+                    cnt += 1;
+                    start_idYearMonth = DecompressToTuple.decompressToIdYearMonth(idYearMonth_compressed_buffer.get(cnt)) ;
+                    start_id = start_idYearMonth[0];
+                    year = start_idYearMonth[1];
+                    month = start_idYearMonth[2];
+                    if(idYearMonth_compressed_buffer.size()>cnt+1){
+                        int[] next_idYearMonth = DecompressToTuple.decompressToIdYearMonth(idYearMonth_compressed_buffer.get(cnt+1));
+                        next_id = next_idYearMonth[0];
+                    }
+                    else next_id = bufferSize;
+                }
+
+                WeatherDataTuple tuple = decompressRow(i, j, year, month, daytime_buffer.get(j),
                                                         temperature_buffer.get(j), humidity_buffer.get(j));
 
                 result.add(tuple.toString());
@@ -194,19 +235,25 @@ public class Disk {
 
     }
 
-    public WeatherDataTuple decompressRow(byte[] id_comp, byte[] daytime_comp, byte[] addr_year_month_comp, 
-                                        byte[] temperature_comp, byte[] humidity_comp) throws ParseException{
+    public WeatherDataTuple decompressRow(int fid, int remain_id, int year, int month, byte[] daytime_comp,
+                                        byte[] temperature_comp, byte[] humidity_comp){
+
+        int id = fid*bufferSize + remain_id;
+
+        int[] daytime = DecompressToTuple.decompressToDayTime(daytime_comp);
+        int day = daytime[0], hour = daytime[1], minute = daytime[2];
+
+        int[] datetime = {year, month, day, hour, minute};
         
-        int id = DecompressToTuple.decompressToID(id_comp);
+        int[] temperature_addr = DecompressToTuple.decompressToValue(temperature_comp);
+        int temperature = temperature_addr[0];
+        int addr = temperature_addr[1];
+        String station = addr == 0? "Changi": "Paya Lebar";
 
-        Date timestamp = DecompressToTuple.decompressToDateTime(daytime_comp, addr_year_month_comp);
-        String station = DecompressToTuple.decompressToStation(addr_year_month_comp);
-        
-        int temperature = DecompressToTuple.decompressToValue(temperature_comp);
+        int[] humidity_addr = DecompressToTuple.decompressToValue(humidity_comp);
+        int humidity = humidity_addr[0];
 
-        int humidity = DecompressToTuple.decompressToValue(humidity_comp);
-
-        WeatherDataTuple tuple = new WeatherDataTuple(id, timestamp, station, temperature, humidity);
+        WeatherDataTuple tuple = new WeatherDataTuple(id, datetime , station, temperature, humidity);
         
         return tuple;
     }
@@ -233,7 +280,7 @@ public class Disk {
     */
 
     public int getSize(){
-        return idCol_buffer.size();
+        return this.temperatureCol_buffer.size() + getNumBlock()*bufferSize;
     }
 
     public int getNumBlock() {
