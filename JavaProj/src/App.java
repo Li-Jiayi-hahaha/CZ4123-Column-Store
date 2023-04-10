@@ -48,7 +48,7 @@ public class App {
 
                 if (input.length() == 9 && input.charAt(0) == 'U'){
                     Output out = new Output();
-                    out.exportToCsv(db.getArray("PayaLebar"));
+                    out.exportToCsv(db.getArray("Changi"));
                 }
                 else if(input.equals("exit")){
                     System.out.println("Thank You!");

@@ -30,7 +30,7 @@ public class DataBaseMgr {
      */
     public DataBaseMgr()
     {
-        String filePath = "javaProj/src/SingaporeWeather.csv";
+        String filePath = "SingaporeWeather.csv";
         this.disk = new Disk(filePath);
         this.bufferSize = 200_000;
         this.idColBuffer = new ArrayList<>();
