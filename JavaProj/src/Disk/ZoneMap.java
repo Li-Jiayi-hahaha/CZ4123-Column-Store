@@ -50,6 +50,7 @@ public class ZoneMap{
 
         for(int i=0;i<zonemaps.size();i++){
             int[] arr = zonemaps.get(i);
+            //for block i, the time range: [minmonthdis, maxmonthdis]
             if(monthDis >= arr[0] && monthDis <= arr[1]){
                 result.add(i);
             }

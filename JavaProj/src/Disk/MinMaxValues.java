@@ -69,13 +69,15 @@ public class MinMaxValues {
 
         int[] result = {minTemperatures.get(i), maxTemperatures.get(i), 
                         minHumidity.get(i), maxHumidity.get(i),
-                        minTemperatures.get(2*n + i), maxTemperatures.get(2*n + i), 
-                        minHumidity.get(2*n + i), maxHumidity.get(2*n + i)};
+                        minTemperatures.get(n + i), maxTemperatures.get(n + i), 
+                        minHumidity.get(n + i), maxHumidity.get(n + i)};
         return result;
     }
 
     private int computeMonthDis(int year, int month){
         //computes month difference from 2002-0 (not exist) to year-month
+        //2002-1 i = 1
+        //2003-1 i = (2003-2002)*12 + 1 = 13
         int yeardis = year - Constants.STARTYEAR;
         return yeardis*12 + month;
     }
