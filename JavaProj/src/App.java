@@ -6,7 +6,8 @@ import java.util.Scanner;
 public class App {
 
     private final Disk dataBaseMgr;
-    private final String filePath = "javaProj/src/SingaporeWeather.csv";
+    private final QueryMgr queryMgr;
+    private final Output writer;
 
     public static void main(String[] args) {
         System.out.println("Hello, World!");
@@ -21,15 +22,9 @@ public class App {
     }
 
     public App() {
-        this.dataBaseMgr = new Disk(filePath);
-        /* 
-        try {
-            this.dataBaseMgr.createZoneMap();
-            this.dataBaseMgr.printZoneMap();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        */
+        this.dataBaseMgr = Disk.getInstance();
+        this.queryMgr = QueryMgr.getInstance();
+        this.writer = new Output();
     }
 
     public void displayMenu() throws Exception {
@@ -58,19 +53,24 @@ public class App {
                 System.out.println("======================================================================================");
 
                 if (input.length() == 9 && input.charAt(0) == 'U'){
-                    System.out.println("Query Function is not implemented yet.");
+
+                    writer.writeQueryHeader();
+                    int year=2002, month = 1;
+                    ArrayList<String> results = queryMgr.queryYearMonth(year, month);
+                    writer.appendQueryResults(results);
+
+                    System.out.println("\nThe query results is exported to output.csv.\n");
                 }
                 else{
-                    System.out.println("The input is not in the correct format of a matric number");
+                    System.out.println("\nThe input is not in the correct format of a matric number\n");
                 }
             }
 
             if (input.equals("2")) {
-                
-                Output out = new Output();
-                ArrayList<String> rows = dataBaseMgr.getAllRows();
-                out.exportDataBaseToCsv(rows);
-                
+
+                ArrayList<String> rows = dataBaseMgr.getAllRowsString();
+                writer.exportDataBaseToCsv(rows);
+
                 System.out.println("\nThe data is exported to ReproducedTable.csv.\n");
                 
             }

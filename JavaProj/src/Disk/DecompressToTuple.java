@@ -11,7 +11,7 @@ public class DecompressToTuple {
 
         int id = idYearMonth >> 9;
         int year = (idYearMonth - (id << 9)) >> 4;
-        year += 2002;
+        year += Constants.STARTYEAR;
         int month = idYearMonth % 16;
 
         int[] result = {id, year, month};

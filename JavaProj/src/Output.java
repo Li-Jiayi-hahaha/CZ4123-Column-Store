@@ -1,6 +1,8 @@
+import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class Output {
@@ -21,15 +23,30 @@ public class Output {
         writer.close();
     }
 
-    public void exportString(String str) throws IOException {
+    public void writeQueryHeader() throws IOException {
 
         String csvFilePath = "javaProj/src/output.csv";
         
         PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath));
         // Write str
-        writer.println(str);
+        writer.println("Date,Station,Category,Value");
 
         writer.close();
     }
+
+    public void appendQueryResults(List<String> strs) throws IOException {
+
+        String csvFilePath = "javaProj/src/output.csv";
+        
+        BufferedWriter writer = new BufferedWriter(new FileWriter(csvFilePath, true));
+
+        // Write strs
+        for(String line: strs){
+            writer.append(line + "\n");
+        }
+
+        writer.close();
+    }
+
 
 }

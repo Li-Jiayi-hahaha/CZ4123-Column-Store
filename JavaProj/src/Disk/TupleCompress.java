@@ -2,8 +2,6 @@ package Disk;
 
 public class TupleCompress {
 
-    private static int buffersize = 2000;
-
     public static byte[] compressDayTime(int day, int hour, int minute){
         int daytime = (day << 11) | (hour << 6) | (minute << 0);
         byte[] result = new byte[2];
@@ -13,7 +11,7 @@ public class TupleCompress {
     }
 
     public static byte[] compressIdYearMonth(int id, int year, int month){
-        int idYearMonth = ( (id % buffersize) << 9) | ((year - 2002) << 4) | (month << 0);
+        int idYearMonth = ( (id % Constants.BUFFERSIZE) << 9) | ((year - Constants.STARTYEAR) << 4) | (month << 0);
 
         byte[] result = new byte[3];
         result[2] = (byte) (idYearMonth >> 16);

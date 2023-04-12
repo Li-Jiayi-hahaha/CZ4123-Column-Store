@@ -15,8 +15,8 @@ public class ColumnStoreDAO{
     private final String[] folder_names = {"yearMonth/", "daytime/", "temperature/", "humidity/"};
     private final int[] item_sizes = {3,2,2,2};
     private final String folder_path_prefix = "javaProj/src/DiskStorage/";
-    private final int buffer_size = 2000;
     private int[] num_files;
+    private int size_last_file = -1;
 
     public ColumnStoreDAO(){
         num_files = new int[]{0,0,0,0};
@@ -43,6 +43,8 @@ public class ColumnStoreDAO{
 
     public int getNumBlock() {return num_files[0];}
 
+    public int getLastBlockSize() {return size_last_file;}
+
     public void addOneCol(int cid, ArrayList<byte[]> buffer){
         String filename = Integer.toString(num_files[cid]) + ".bin";
         String filepath = folder_path_prefix + folder_names[cid] + filename;
@@ -58,6 +60,10 @@ public class ColumnStoreDAO{
         }
 
         num_files[cid] += 1;
+
+        if(cid != 0){
+            size_last_file = buffer.size();
+        }
     }
 
     public ArrayList<byte[]> readOneFile(int cid, int fid){
