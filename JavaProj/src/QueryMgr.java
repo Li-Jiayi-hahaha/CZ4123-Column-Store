@@ -105,4 +105,26 @@ public class QueryMgr{
 
         return tuple.getDateString() + ","  + tuple.getStation() + "," + properties[pid] + "," + value_str;
     }
+
+    public ArrayList<String> metricToLocationYear (String input){
+        ArrayList<String> result = new ArrayList<>();
+        ArrayList<String> yearList = new ArrayList<>();
+        char seventhChar = input.charAt(6);
+        char eighthChar = input.charAt(7);
+        if (seventhChar % 2 == 0) {
+            result.add("Changi");
+        } else {
+            result.add("Paya Lebar");
+        }
+
+        for (int year = 2002; year <= 2021; year++) {
+            yearList.add(Integer.toString(year));
+            if (Integer.toString(year).charAt(3) == eighthChar){
+                result.add(Integer.toString(year));
+            }
+        }
+        
+        return result;
+
+    }
 }
