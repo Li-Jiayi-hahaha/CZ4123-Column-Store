@@ -27,6 +27,9 @@ public class ColumnStoreDAO{
 
     private void purgeDirectory(String dir_path) {
         File dir = new File(dir_path);
+        if (!dir.exists()){
+            dir.mkdirs();
+        }
         for (File file: dir.listFiles()) {
             file.delete();
         }

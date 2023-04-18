@@ -27,6 +27,19 @@ public class App {
         this.writer = new Output();
     }
 
+    private boolean checkMetricFormat(String metric){ 
+        if(metric.length() != 9) return false;
+        if(metric.charAt(0)!='U') return false;
+        if(metric.charAt(8) < 'A' || metric.charAt(8) > 'Z') return false;
+
+        for(int i=1;i<8;i++){
+            if(metric.charAt(i) < '0' || metric.charAt(i) > '9') return false;
+        }
+
+        return true;
+    }
+        
+
     public void displayMenu() throws Exception {
 
         System.out.println("======================================================================================");
@@ -52,13 +65,34 @@ public class App {
                 input = in.nextLine();
                 System.out.println("======================================================================================");
 
-                if (input.length() == 9 && input.charAt(0) == 'U'){
-
+                if (checkMetricFormat(input)){
+                    
+                    ArrayList<String> resultsAll = new ArrayList<>();
                     writer.writeQueryHeader();
-                    int year=2002, month = 1;
-                    ArrayList<String> results = queryMgr.queryYearMonth(year, month);
-                    writer.appendQueryResults(results);
+                    ArrayList<String> locYear = queryMgr.metricToLocationYear(input);
+                    int year1=Integer.parseInt(locYear.get(1)), year2=Integer.parseInt(locYear.get(2));
+                    String location = locYear.get(0);
+                    
+                    for (int month = 1; month <= 12; month++) {
+                        ArrayList<String> results = queryMgr.queryYearMonth(year1, month);
+                        for(String i :results){
+                            if (i.contains(location)) {
+                                resultsAll.add(i);
+                            }
+                            
+                        }
+                    }
 
+                    for (int month = 1; month <= 12; month++) {
+                        ArrayList<String> results = queryMgr.queryYearMonth(year2, month);
+                        for(String i :results){
+                            if (i.contains(location)) {
+                                resultsAll.add(i);
+                            }
+                        }
+                    }
+                    writer.appendQueryResults(resultsAll);
+                    
                     System.out.println("\nThe query results is exported to output.csv.\n");
                 }
                 else{
