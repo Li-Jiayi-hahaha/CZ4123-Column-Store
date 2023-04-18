@@ -40,7 +40,7 @@ public class QueryMgr{
 
         ArrayList<HashSet<Integer>> registerd_days = new ArrayList<>(4);
         
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 8; i++) {
             HashSet<Integer> set = new HashSet<>();
             registerd_days.add(set);
         }
@@ -61,31 +61,35 @@ public class QueryMgr{
 
                     if(temp == min_temp[addr]){
                         int pid = 0;
-                        if(!registerd_days.get(pid).contains(day)){
-                            registerd_days.get(pid).add(day);
+                        int sid = addr * 4 + pid;
+                        if(!registerd_days.get(sid).contains(day)){
+                            registerd_days.get(sid).add(day);
                             result.add(processTuple(tuple, pid));
                         }
                         
                     }
                     if(temp == max_temp[addr]){
                         int pid = 1;
-                        if(!registerd_days.get(pid).contains(day)){
-                            registerd_days.get(pid).add(day);
+                        int sid = addr * 4 + pid;
+                        if(!registerd_days.get(sid).contains(day)){
+                            registerd_days.get(sid).add(day);
                             result.add(processTuple(tuple, pid));
                         }
                     }
 
                     if(hum == min_hum[addr]){
                         int pid = 2;
-                        if(!registerd_days.get(pid).contains(day)){
-                            registerd_days.get(pid).add(day);
+                        int sid = addr * 4 + pid;
+                        if(!registerd_days.get(sid).contains(day)){
+                            registerd_days.get(sid).add(day);
                             result.add(processTuple(tuple, pid));
                         }
                     }
                     if(hum == max_hum[addr]){
                         int pid = 3;
-                        if(!registerd_days.get(pid).contains(day)){
-                            registerd_days.get(pid).add(day);
+                        int sid = addr * 4 + pid;
+                        if(!registerd_days.get(sid).contains(day)){
+                            registerd_days.get(sid).add(day);
                             result.add(processTuple(tuple, pid));
                         }
                     }
@@ -96,7 +100,7 @@ public class QueryMgr{
 
         return result;
     }
-
+ 
     private String processTuple(WeatherDataTuple tuple, int pid){
         String[] properties = {"Min Temperature", "Max Temperature", "Min Humidity", "Max Humidity"};
 
