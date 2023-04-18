@@ -27,6 +27,19 @@ public class App {
         this.writer = new Output();
     }
 
+    private boolean checkMetricFormat(String metric){ 
+        if(metric.length() != 9) return false;
+        if(metric.charAt(0)!='U') return false;
+        if(metric.charAt(8) < 'A' || metric.charAt(8) > 'Z') return false;
+
+        for(int i=1;i<8;i++){
+            if(metric.charAt(i) < '0' || metric.charAt(i) > '9') return false;
+        }
+
+        return true;
+    }
+        
+
     public void displayMenu() throws Exception {
 
         System.out.println("======================================================================================");
@@ -52,7 +65,7 @@ public class App {
                 input = in.nextLine();
                 System.out.println("======================================================================================");
 
-                if (input.length() == 9 && input.charAt(0) == 'U'){
+                if (checkMetricFormat(input)){
                     
                     ArrayList<String> resultsAll = new ArrayList<>();
                     writer.writeQueryHeader();
