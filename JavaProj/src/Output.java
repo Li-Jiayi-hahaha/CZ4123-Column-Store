@@ -7,6 +7,14 @@ import java.util.List;
 
 public class Output {
 
+    private String filepath;
+
+    public void updateFilePath(String input){
+
+        this.filepath = "ScanResult_" + input + ".csv";
+
+    }
+
     public void exportDataBaseToCsv(List<String> Array) throws IOException {
         String csvFilePath = "javaProj/src/ReproducedTable.csv";
         
@@ -25,8 +33,9 @@ public class Output {
 
     public void writeQueryHeader() throws IOException {
 
-        String csvFilePath = "javaProj/src/output.csv";
-        
+        // String csvFilePath = "javaProj/src/output.csv";
+        String csvFilePath = filepath;
+
         PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath));
         // Write str
         writer.println("Date,Station,Category,Value");
@@ -36,7 +45,7 @@ public class Output {
 
     public void appendQueryResults(List<String> strs) throws IOException {
 
-        String csvFilePath = "javaProj/src/output.csv";
+        String csvFilePath = filepath;
         
         BufferedWriter writer = new BufferedWriter(new FileWriter(csvFilePath, true));
 
