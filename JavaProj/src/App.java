@@ -67,6 +67,7 @@ public class App {
 
                 if (checkMetricFormat(input)){
                     
+                    writer.updateFilePath(input);
                     ArrayList<String> resultsAll = new ArrayList<>();
                     writer.writeQueryHeader();
                     ArrayList<String> locYear = queryMgr.metricToLocationYear(input);
