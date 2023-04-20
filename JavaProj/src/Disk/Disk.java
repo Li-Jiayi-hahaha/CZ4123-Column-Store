@@ -180,7 +180,7 @@ public class Disk {
         addTupleToVerticallyCompressedYearMonth(id, year, month);
 
         String station = tuple.getStation();
-        int addr = station.equals("Changi")? 0:1;
+        int addr = Constants.station2Addr(station);
 
         byte[] temperature_comp = TupleCompress.compressValue(tuple.getTemperature(), addr);
         this.temperatureCol_buffer.add(temperature_comp);
@@ -242,7 +242,7 @@ public class Disk {
             int[] humidityAddr = humidityAddrs.get(i);
             int humidity = humidityAddr[0];
 
-            String station = addr == 0? "Changi" : "Paya Lebar";
+            String station = Constants.addr2Station(addr);
             int[] datetime = {year, month, day, hour, minute};
             WeatherDataTuple tuple = new WeatherDataTuple(id, datetime, station, temperature, humidity);
 

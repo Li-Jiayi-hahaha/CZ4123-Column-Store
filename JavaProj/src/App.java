@@ -70,27 +70,18 @@ public class App {
                     writer.updateFilePath(input);
                     ArrayList<String> resultsAll = new ArrayList<>();
                     writer.writeQueryHeader();
-                    ArrayList<String> locYear = queryMgr.metricToLocationYear(input);
-                    int year1=Integer.parseInt(locYear.get(1)), year2=Integer.parseInt(locYear.get(2));
-                    String location = locYear.get(0);
+                    ArrayList<Integer> locYear = queryMgr.metricToLocationYear(input);
+                    int year1=locYear.get(1), year2=locYear.get(2);
+                    int address = locYear.get(0);
                     
                     for (int month = 1; month <= 12; month++) {
-                        ArrayList<String> results = queryMgr.queryYearMonth(year1, month);
-                        for(String i :results){
-                            if (i.contains(location)) {
-                                resultsAll.add(i);
-                            }
-                            
-                        }
+                        ArrayList<String> results = queryMgr.queryYearMonth(year1, month, address);
+                        resultsAll.addAll(results);
                     }
 
                     for (int month = 1; month <= 12; month++) {
-                        ArrayList<String> results = queryMgr.queryYearMonth(year2, month);
-                        for(String i :results){
-                            if (i.contains(location)) {
-                                resultsAll.add(i);
-                            }
-                        }
+                        ArrayList<String> results = queryMgr.queryYearMonth(year2, month, address);
+                        resultsAll.addAll(results);
                     }
                     writer.appendQueryResults(resultsAll);
                     
