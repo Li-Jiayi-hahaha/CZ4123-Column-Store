@@ -42,7 +42,7 @@ public class MinMaxValues {
     }
 
     public void addTuple(WeatherDataTuple tuple){
-        int addr = tuple.getStation().equals("Changi")? 0:1;
+        int addr = Constants.station2Addr(tuple.getStation());
 
         int year = tuple.getYear();
         int month = tuple.getMonth();

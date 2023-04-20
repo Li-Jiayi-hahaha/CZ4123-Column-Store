@@ -47,14 +47,14 @@ public class WeatherDataTuple {
 
     public int getHumidity() { return humidity; }
 
-    public String timestampToString() {
-        String str_date = getDateString();
+    public static String timestampToString(int year, int month, int day, int hour, int minute) {
+        String str_date = getDateString(year, month, day);
         String str_time = String.format("%02d",hour) + ":" + String.format("%02d",minute);
         String str_datetime = str_date + " " + str_time;
         return str_datetime;
     }
 
-    public String getDateString(){
+    public static String getDateString(int year, int month, int day){
         return String.format("%04d",year) + "-" + String.format("%02d",month) + "-" + String.format("%02d",day);
     }
 
@@ -64,6 +64,6 @@ public class WeatherDataTuple {
     }
 
     public String toString() {
-        return id + "," + timestampToString() + "," + station + "," + valToString(temperature) + "," + valToString(humidity);
+        return id + "," + timestampToString(year, month, day, hour, minute) + "," + station + "," + valToString(temperature) + "," + valToString(humidity);
     }
 }

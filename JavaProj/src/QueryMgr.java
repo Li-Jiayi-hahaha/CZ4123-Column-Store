@@ -5,6 +5,7 @@ import Disk.MinMaxValues;
 import Disk.WeatherDataTuple;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 
 public class QueryMgr{
@@ -28,19 +29,21 @@ public class QueryMgr{
         return single_instance;
     }
 
-    public ArrayList<String> queryYearMonth(int year, int month){
+    public ArrayList<String> queryYearMonth(int year, int month, int addr){
         ArrayList<String> result = new ArrayList<>();
 
         int[] min_max_vals = minMaxValues.queryMinMaxValues(year, month);
 
-        int[] min_temp = {min_max_vals[0], min_max_vals[4]};
-        int[] max_temp = {min_max_vals[1], min_max_vals[5]};
-        int[] min_hum  = {min_max_vals[2], min_max_vals[6]};
-        int[] max_hum  = {min_max_vals[3], min_max_vals[7]};
+        int min_temp = min_max_vals[addr*4 + 0];
+        int max_temp = min_max_vals[addr*4 + 1];
+        int min_hum = min_max_vals[addr*4 + 2];
+        int max_hum = min_max_vals[addr*4 + 3];
+
+        int[] values = {min_temp, max_temp, min_hum, max_hum};
 
         ArrayList<HashSet<Integer>> registerd_days = new ArrayList<>(4);
         
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 4; i++) {
             HashSet<Integer> set = new HashSet<>();
             registerd_days.add(set);
         }
@@ -48,83 +51,108 @@ public class QueryMgr{
         ArrayList<Integer> blocks = zoneMap.getOverlapedBlocks(year, month);
 
         for(int fid: blocks){
-            ArrayList<WeatherDataTuple> tuples = disk.getBlock(fid);
+            //ArrayList<WeatherDataTuple> tuples = disk.getBlock(fid);
 
-            for(WeatherDataTuple tuple: tuples){
-                if(tuple.getYear() == year && tuple.getMonth() == month){
-                    int addr = tuple.getStation().equals("Changi")? 0:1;
+            ArrayList<int[]> idYearMonth = disk.getBlockIdYearMonth(fid);
+            HashSet<Integer> filter_id = new HashSet<Integer>();
 
-                    int temp = tuple.getTemperature();
-                    int hum = tuple.getHumidity();
+            for(int[] arr: idYearMonth){
+                int t_id = arr[0], t_year = arr[1], t_month =arr[2];
+                if(t_year == year && t_month == month){
+                    filter_id.add(t_id % Constants.BUFFERSIZE);
+                }
+            }
 
-                    int day = tuple.getDay();
+            // pid: 0: min_temp, 1: max_temp, 2: min_hum, 3:max_hum
 
-                    if(temp == min_temp[addr]){
-                        int pid = 0;
-                        int sid = addr * 4 + pid;
-                        if(!registerd_days.get(sid).contains(day)){
-                            registerd_days.get(sid).add(day);
-                            result.add(processTuple(tuple, pid));
-                        }
+            ArrayList<int[]> id_pid = new ArrayList<int[]>();
+
+            ArrayList<int[]> temp_addrs = disk.getBlockTemperature(fid);
+            for(int i=0; i<temp_addrs.size();i++){
+            
+                int[] temp_addr = temp_addrs.get(i);
+                int t_temp = temp_addr[0], t_addr = temp_addr[1];
+                if(t_addr == addr){
+                    if(filter_id.contains(i)){
                         
-                    }
-                    if(temp == max_temp[addr]){
-                        int pid = 1;
-                        int sid = addr * 4 + pid;
-                        if(!registerd_days.get(sid).contains(day)){
-                            registerd_days.get(sid).add(day);
-                            result.add(processTuple(tuple, pid));
+                        if(t_temp == min_temp) {
+                            int[] arr = {i, 0};
+                            id_pid.add(arr);
                         }
-                    }
 
-                    if(hum == min_hum[addr]){
-                        int pid = 2;
-                        int sid = addr * 4 + pid;
-                        if(!registerd_days.get(sid).contains(day)){
-                            registerd_days.get(sid).add(day);
-                            result.add(processTuple(tuple, pid));
-                        }
-                    }
-                    if(hum == max_hum[addr]){
-                        int pid = 3;
-                        int sid = addr * 4 + pid;
-                        if(!registerd_days.get(sid).contains(day)){
-                            registerd_days.get(sid).add(day);
-                            result.add(processTuple(tuple, pid));
+                        if(t_temp == max_temp) {
+                            int[] arr = {i, 1};
+                            id_pid.add(arr);
                         }
                     }
                 }
             }
 
+            ArrayList<int[]> hum_addrs = disk.getBlockHumidity(fid);
+            for(int i=0; i<hum_addrs.size();i++){
+            
+                int[] hum_addr = hum_addrs.get(i);
+                int t_hum = hum_addr[0], t_addr = hum_addr[1];
+                if(t_addr == addr){
+                    if(filter_id.contains(i)){
+                        
+                        if(t_hum == min_hum) {
+                            int[] arr = {i, 2};
+                            id_pid.add(arr);
+                        }
+
+                        if(t_hum == max_hum) {
+                            int[] arr = {i, 3};
+                            id_pid.add(arr);
+                        }
+                    }
+                }
+            }
+
+            ArrayList<int[]> daytimes = disk.getBlockDayTime(fid);
+
+            for(int[] arr: id_pid){
+                int id = arr[0], pid = arr[1];
+                int[] daytime = daytimes.get(id);
+                int day = daytime[0];
+
+                if(!registerd_days.get(pid).contains(day)){
+                    registerd_days.get(pid).add(day);
+                    result.add(processLine(year, month, day, addr, pid, values[pid]));
+                }
+            }
+
         }
+        Collections.sort(result);
 
         return result;
     }
  
-    private String processTuple(WeatherDataTuple tuple, int pid){
+    private String processLine(int year, int month, int day, int addr, int pid, int value){
         String[] properties = {"Min Temperature", "Max Temperature", "Min Humidity", "Max Humidity"};
 
-        int value = pid < 2? tuple.getTemperature() : tuple.getHumidity();
+        String date_str = WeatherDataTuple.getDateString(year, month, day);
+        String station = Constants.addr2Station(addr);
         String value_str = WeatherDataTuple.valToString(value);
 
-        return tuple.getDateString() + ","  + tuple.getStation() + "," + properties[pid] + "," + value_str;
+        return date_str + ","  + station + "," + properties[pid] + "," + value_str;
     }
 
-    public ArrayList<String> metricToLocationYear (String input){
-        ArrayList<String> result = new ArrayList<>();
-        ArrayList<String> yearList = new ArrayList<>();
+    //{addr, year1, year2}
+    public ArrayList<Integer> metricToLocationYear (String input){
+        ArrayList<Integer> result = new ArrayList<>();
+
         char seventhChar = input.charAt(6);
         char eighthChar = input.charAt(7);
         if (seventhChar % 2 == 0) {
-            result.add("Changi");
+            result.add(0);
         } else {
-            result.add("Paya Lebar");
+            result.add(1);
         }
 
         for (int year = 2002; year <= 2021; year++) {
-            yearList.add(Integer.toString(year));
             if (Integer.toString(year).charAt(3) == eighthChar){
-                result.add(Integer.toString(year));
+                result.add(year);
             }
         }
         
