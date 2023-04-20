@@ -10,7 +10,7 @@ public class App {
     private final Output writer;
 
     public static void main(String[] args) {
-        System.out.println("Hello, World!");
+        System.out.println("Starting...");
 
         try {
             App app = new App();
@@ -43,7 +43,7 @@ public class App {
     public void displayMenu() throws Exception {
 
         System.out.println("======================================================================================");
-        System.out.println("            << Welcome to Group X Project 1 >>");
+        System.out.println("            << Welcome to Group 15 Project 1 >>");
         System.out.println();
         
         String input = "";
